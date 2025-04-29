@@ -9,18 +9,4 @@ Despite that hiccup, I achieved 97% uptime for the router. It was down for only 
 
 In general, your best bet is to just reboot the operating system onto the device if you were genuinely hacked especially if it's for home use. If you need this for a business to keep operstions running I would honestly suggest downloading the files, then disconnecting your wan interface. The downtime might not be great, but it is a hell of a lot better than permanent donwtime. 
 
-This program operates in stages:
-1.) Create directories for later use
-    a.) Quarentine
-    b.) Backups
-    c.) Scripts
-    
-2.) Replacing rc.initial with a modified one
-
-3.) presenting you with a menu of cleanup options
-    a.) Find webhooks
-    b.) Find added users
-    c.) see suspecious processes
-    d.) Restore certail files
-    c. Etc.
-4.) if at any moment, the script stope, the origional rc.initial file is restored
+The main program has a few function as it creates directories for later use, replaces rc.initial with a modified version, presents you with a menu of cleanup options, and if for any reason the script stops, the origional rc.initial file is restored.

@@ -7,6 +7,6 @@ However, I was still able to use many of the concepts and partial scripts to my 
 
 Despite that hiccup, I achieved 97% uptime for the router. It was down for only 8 minutes over 4.5 hours, 5 of which were due to me restarting the router.
 
-In general, your best bet is to just reboot the operating system onto the device if you were genuinely hacked especially if it's for home use. If you need this for a business to keep operstions running I would honestly suggest downloading the files, then disconnecting your wan interface. The downtime might not be great, but it is a hell of a lot better than permanent donwtime. 
+In general, your best bet is to reinstall the operating system onto the device if you were genuinely hacked especially if it's for home use. If you need this for a business to keep operstions running I would honestly suggest downloading the files, then disconnecting your wan interface. The downtime might not be great, but it is a hell of a lot better than permanent donwtime. 
 
-The main program has a few function as it creates directories for later use, replaces rc.initial with a modified version, presents you with a menu of cleanup options, and if for any reason the script stops, the origional rc.initial file is restored.
+The main program has a few functions as it creates directories for later use, replaces rc.initial with a modified version, presents you with a menu of cleanup options, and if for any reason the script stops, the origional rc.initial file is restored. This allows you yo go through different cleanup options based on what you need. any script that replaces or modifies files either creates a backup, quarentines it, or both.

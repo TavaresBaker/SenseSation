@@ -1,6 +1,6 @@
 # SenseSation
 
-Background:
+## Background:
 SenseSation is a collection of scripts designed to defend pfSense routers against cyber attacks.
 
 My name is Tavares Baker. At the time of writing this, I was a freshman in college preparing for the bi-annual University at Buffalo Lockdown competition. I created these scripts to automate and speed up the system-cleansing process, aiming to kick the red team off the router before they could cause significant damage. Unfortunately, the first draft of SenseSation wasn’t finished in time.

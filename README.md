@@ -1,12 +1,25 @@
 # SenseSation
-A compilation of scripts to fight cyber attacks against pfSense
 
-My name is Tavares Baker, and at the time of writing this, I was a freshman in college preparing for the bi-annual University at Buffalo Lockdown competition. I decided to create scripts to automate and speed up my system cleansing process, aiming to kick the red team out before they could do any damage to the router. Unfortunately, the first complete draft of my script wasn't finished in time.
+SenseSation is a collection of scripts designed to defend pfSense routers against cyber attacks.
 
-However, I was still able to use many of the concepts and partial scripts to my advantage during the competition. While they helped, they weren't quite enough. I did manage to completely remove the red team from the router—excluding a brief incident where I was PWNed by a LAN machine. I've since learned from those mistakes.
+My name is Tavares Baker. At the time of writing this, I was a freshman in college preparing for the bi-annual University at Buffalo Lockdown competition. I created these scripts to automate and speed up the system-cleansing process, aiming to kick the red team off the router before they could cause significant damage. Unfortunately, the first draft of SenseSation wasn’t finished in time.
 
-Despite that hiccup, I achieved 97% uptime for the router. It was down for only 8 minutes over 4.5 hours, 5 of which were due to me restarting the router.
+Despite that, I was able to use many of the concepts and partial scripts during the competition. While they helped, they weren’t quite enough. I did manage to completely remove the red team from the router—aside from a brief moment when I was PWNed by a LAN machine. I’ve since learned from that experience.
 
-In general, your best bet is to reinstall the operating system onto the device if you were genuinely hacked especially if it's for home use. If you need this for a business to keep operstions running I would honestly suggest downloading the files, then disconnecting your wan interface. The downtime might not be great, but it is a hell of a lot better than permanent donwtime. 
+Even with that hiccup, I maintained 97% uptime for the router. It was down for only 8 minutes over 4.5 hours, 5 of which were from a manual reboot.
 
-The main program has a few functions as it creates directories for later use, replaces rc.initial with a modified version, presents you with a menu of cleanup options, and if for any reason the script stops, the origional rc.initial file is restored. This allows you yo go through different cleanup options based on what you need. any script that replaces or modifies files either creates a backup, quarentines it, or both.
+## Recommendation: 
+If you suspect your device has been compromised—especially in a home environment—your best option is to reinstall the operating system.
+For business-critical environments, download the scripts, disconnect the WAN interface, and proceed with caution. Some downtime is better than permanent downtime.
+
+## What SenseSation Does
+
+- Creates necessary directories for use during cleanup
+- Replaces rc.initial with a modified version that presents a menu of cleanup options
+- Automatically restores the original rc.initial if the script is interrupted
+- Offers staged cleanup procedures tailored to your situation
+- Backs up and/or quarantines any file it modifies
+
+## Why Use SenseSation?
+
+SenseSation is built to detect persistence and tampering on your pfSense machine. Instead of writing or downloading multiple cleanup scripts, you only need this one tool. It streamlines the process, offering a guided approach to remediation and helping you regain control of your router with minimal hassle.

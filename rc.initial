@@ -1,0 +1,134 @@
+#!/bin/sh
+
+# SenseSation rc.initial
+
+# Keep the user in the menu
+trap : INT
+trap : QUIT
+trap : ILL
+
+while : ; do
+
+if [ -f /tmp/ttybug ]; then
+	/bin/rm /tmp/ttybug
+	exit && exit && logout
+fi
+
+/etc/rc.banner
+
+# Read product_name from $g, defaults to pfSense
+if [ -f /etc/product_name ]; then
+	product_name=$(/bin/cat /etc/product_name)
+else
+	product_name=$(/usr/local/sbin/read_global_var product_name pfSense)
+fi
+
+# Read product_label from $g, defaults to pfSense
+if [ -f /etc/product_label ]; then
+	product_label=$(/bin/cat /etc/product_label)
+else
+	product_label=$(/usr/local/sbin/read_global_var product_label pfSense)
+fi
+
+# Check to see if SSH is running.
+if /bin/pgrep -qaF /var/run/sshd.pid sshd 2>/dev/null; then
+	sshd_option='Disable'
+else
+	sshd_option='Enable'
+fi
+
+echo ""
+echo ""
+
+# ASCII Art — blue and red only, reset after
+echo -e "\033[1;34m     _____                      \033[1;31m_____       __  _           "
+echo -e "\033[1;34m    / ___/___  ____  ________  \033[1;31m/ ___/____ _/ /_(_)___  ____ "
+echo -e "\033[1;34m    \\__ \\/ _ \\/ __ \\/ ___/ _ \\ \033[1;31m\\__ \\/ __ \`/ __/ / __ \\/ __ \\"
+echo -e "\033[1;34m   ___/ /  __/ / / (__  /  __ \033[1;31m___/ / /_/ / /_/ / /_/ / / / /"
+echo -e "\033[1;34m  /____/\\___/_/ /_/____/\\___/\033[1;31m/_____/\__,/\\__/_/\\____/_/ /_/"
+echo -e "\033[0m"  # Reset color after ASCII
+
+echo ""
+echo ""
+
+# Console Menu (default color = white)
+echo " 0) Exit                                1) Shell"
+echo " 2) Restore Binaries                    3) Restore Files"
+echo " 4) Find Added Users                    5) Find Points of Entry"
+echo " 6) Find Webhooks                       7) Nuke Web Console"
+echo " 8) Find Suspicious Processes           9) Deploy PFBlocker"
+echo ""
+echo ""
+
+read -p "Enter a number: " opmode
+echo
+
+case ${opmode} in
+100)
+	protocol=$(/usr/local/sbin/read_xml_tag.sh string system/webgui/protocol)
+	port=$(/usr/local/sbin/read_xml_tag.sh string system/webgui/port)
+	[ -z "$protocol" ] && protocol='http'
+	if [ -z "$port" ]; then
+		case $protocol in
+			https) port=443;;
+			*)     port=80;;
+		esac
+	fi
+	links "${protocol}://localhost:${port}"
+	;;
+
+'')
+	if [ -n "$SSH_CONNECTION" ]; then
+		exit
+	else
+		/bin/kill $PPID ; exit
+	fi
+	;;
+
+9)
+  	/root/SenseSation/Scripts/deploy_pfblocker.sh
+  	;;
+
+8)
+	/root/SenseSation/Scripts/find_suspecious_processes.sh
+	;;
+
+7)
+	/root/SenseSation/Scripts/nuke_GUI.sh
+	;;
+
+6)
+	/root/SenseSation/Scripts/find_webhooks.sh
+	;;
+
+5)
+	/root/SenseSation/Scripts/shell_hunter.sh
+	;;
+
+4)
+	/root/SenseSation/Scripts/delete_users.sh
+	;;
+
+3)
+	/root/SenseSation/Scripts/restore_files.sh
+	;;
+
+2)
+	/root/SenseSation/Scripts/restore_binaries.sh
+	;;
+
+1)
+	/bin/sh
+	;;
+
+0)
+	exit
+	;;
+
+*)
+	echo "Invalid option."
+	exit 1
+	;;
+esac
+
+done

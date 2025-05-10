@@ -1,0 +1,97 @@
+#!/usr/local/bin/php-cgi -f
+<?php
+/*
+ * rc.banner - Sensation Edition
+ * Custom system banner for the Sensation cleanup script
+ * (c) 2025 John Doe / Apogee Networks
+ */
+
+require_once("config.inc");
+require_once("gwlb.inc");
+require_once("interfaces.inc");
+
+$hostname = config_get_path('system/hostname');
+$machine = trim(`uname -m`);
+$platform = system_identify_specific_platform();
+
+$sensation_version_file = "/etc/sensation_version";
+$sensation_version = "v1.0.0";
+if (file_exists($sensation_version_file)) {
+	$sensation_version = trim(file_get_contents($sensation_version_file));
+}
+
+// Print Sensation welcome banner
+printf("\n*** Welcome to Sensation %s (%s) on %s ***\n", $sensation_version, $machine, $hostname);
+if (isset($platform['descr'])) {
+	printf("Platform: %s\n", $platform['descr']);
+}
+printf("\n");
+
+// Get interfaces
+$iflist = get_configured_interface_with_descr(true);
+
+// Calculate widths for alignment
+$realif_width = 1;
+$tobanner_width = 1;
+foreach ($iflist as $ifname => $friendly) {
+	$realif = get_real_interface($ifname);
+	$realif_length = strlen($realif);
+	if ($realif_length > $realif_width) {
+		$realif_width = $realif_length;
+	}
+	$tobanner = "{$friendly} ({$ifname})";
+	$tobanner_length = strlen($tobanner);
+	if ($tobanner_length > $tobanner_width) {
+		$tobanner_width = $tobanner_length;
+	}
+}
+$v6line_width = $realif_width + $tobanner_width + 9;
+
+// Print interface summaries
+foreach ($iflist as $ifname => $friendly) {
+	$ifconf = config_get_path("interfaces/{$ifname}");
+
+	$class = match($ifconf['ipaddr'] ?? '') {
+		'dhcp' => '/DHCP4',
+		'pppoe' => '/PPPoE',
+		'pptp' => '/PPTP',
+		'l2tp' => '/L2TP',
+		default => '',
+	};
+
+	$class6 = match($ifconf['ipaddrv6'] ?? '') {
+		'dhcp6' => '/DHCP6',
+		'slaac' => '/SLAAC',
+		'6rd' => '/6RD',
+		'6to4' => '/6to4',
+		'track6' => '/t6',
+		default => '',
+	};
+
+	$ipaddr = get_interface_ip($ifname);
+	$subnet = get_interface_subnet($ifname);
+	$ipaddr6 = get_interface_ipv6($ifname);
+	$subnet6 = get_interface_subnetv6($ifname);
+	$realif = get_real_interface($ifname);
+	$tobanner = "{$friendly} ({$ifname})";
+
+	printf(" %-{$tobanner_width}s -> \%-{$realif_width}s\ -> ",
+		$tobanner,
+		$realif
+	);
+	$v6first = false;
+	if (!empty($ipaddr) && !empty($subnet)) {
+		printf("v4%s: %s/%s", $class, $ipaddr, $subnet);
+	} else {
+		$v6first = true;
+	}
+	if (!empty($ipaddr6) && !empty($subnet6)) {
+		if (!$v6first) {
+			printf("\n%s", str_repeat(" ", $v6line_width));
+		}
+		printf("v6%s: %s/%s\033[0m", $class6, $ipaddr6, $subnet6);
+	}
+	printf("\n");
+}
+printf("\n");
+?>

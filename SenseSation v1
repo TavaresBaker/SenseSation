@@ -1,0 +1,826 @@
+#!/bin/sh
+
+# Create the directories
+mkdir -p /root/SenseSation/Scripts /root/SenseSation/Backups /root/SenseSation/Quarantine /root/SenseSation/Supporting_Files
+
+# Deploy rc.initial
+cat << 'EOF' > /root/SenseSation/Supporting_Files/rc.initial
+#!/bin/sh
+
+# SenseSation rc.initial
+
+
+while : ; do
+
+if [ -f /tmp/ttybug ]; then
+	/bin/rm /tmp/ttybug
+	exit && exit && logout
+fi
+
+/etc/rc.banner
+
+# Read product_name from $g, defaults to pfSense
+if [ -f /etc/product_name ]; then
+	product_name=$(/bin/cat /etc/product_name)
+else
+	product_name=$(/usr/local/sbin/read_global_var product_name pfSense)
+fi
+
+# Read product_label from $g, defaults to pfSense
+if [ -f /etc/product_label ]; then
+	product_label=$(/bin/cat /etc/product_label)
+else
+	product_label=$(/usr/local/sbin/read_global_var product_label pfSense)
+fi
+
+# Check to see if SSH is running.
+if /bin/pgrep -qaF /var/run/sshd.pid sshd 2>/dev/null; then
+	sshd_option='Disable'
+else
+	sshd_option='Enable'
+fi
+
+echo ""
+echo ""
+
+# ASCII Art
+echo -e "\033[1;34m     _____                      \033[1;31m_____       __  _           "
+echo -e "\033[1;34m    / ___/___  ____  ________  \033[1;31m/ ___/____ _/ /_(_)___  ____ "
+echo -e "\033[1;34m    \\__ \\/ _ \\/ __ \\/ ___/ _ \\ \033[1;31m\\__ \\/ __ \`/ __/ / __ \\/ __ \\"
+echo -e "\033[1;34m   ___/ /  __/ / / (__  /  __ \033[1;31m___/ / /_/ / /_/ / /_/ / / / /"
+echo -e "\033[1;34m  /____/\\___/_/ /_/____/\\___/\033[1;31m/_____/\__,/\\__/_/\\____/_/ /_/"
+echo -e "\033[0m"
+
+echo ""
+echo ""
+echo " 0) Exit                                1) Shell"
+echo " 2) Restore Binaries                    3) Restore Files"
+echo " 4) Find Added Users                    5) Find Points of Entry"
+echo " 6) Find Webhooks                       7) Nuke Web Console"
+echo " 8) Find Suspicious Processes           9) Deploy PFBlocker"
+echo ""
+echo ""
+
+read -p "Enter a number: " opmode
+echo
+
+case ${opmode} in
+  '')
+    if [ -n "$SSH_CONNECTION" ]; then
+        exit
+    else
+        /bin/kill $PPID ; exit
+    fi
+    ;;
+
+  0)
+    echo "Exiting to shell..."
+    exec /bin/tcsh -l
+    ;;
+
+  1)
+    exec /bin/tcsh -l
+    ;;
+
+  2)
+    /root/SenseSation/Scripts/restore_binaries.sh
+    echo "Press ENTER to return to the menu..."
+    read dummy
+    ;;
+
+  3)
+    /root/SenseSation/Scripts/restore_files.sh
+    echo "Press ENTER to return to the menu..."
+    read dummy
+    ;;
+
+  4)
+    echo "Launching interactive shell to find added users..."
+    /root/SenseSation/Scripts/delete_users.sh
+    ;;
+
+  5)
+    echo "Launching shell to find points of entry..."
+    exec /bin/tcsh -l
+    /root/SenseSation/Scripts/shell_hunter.sh
+    ;;
+
+  6)
+    echo "Launching shell to find Discord webhooks..."
+    exec /bin/tcsh -l
+    /root/SenseSation/Scripts/find_webhooks.sh
+    ;;
+
+  7)
+    echo "Launching shell to nuke GUI..."
+    exec /bin/tcsh -l
+    /root/SenseSation/Scripts/nuke_gui.sh
+    ;;
+
+  8)
+    echo "Launching shell to investigate processes..."
+    exec /bin/tcsh -l
+    /root/SenseSation/Scripts/find_suspecious_processes.sh
+    ;;
+
+  9)
+    /root/SenseSation/Scripts/deploy_pfblocker.sh
+    echo "Press ENTER to return to the menu..."
+    read dummy
+    ;;
+
+  100)
+    protocol=$(/usr/local/sbin/read_xml_tag.sh string system/webgui/protocol)
+    port=$(/usr/local/sbin/read_xml_tag.sh string system/webgui/port)
+    [ -z "$protocol" ] && protocol='http'
+    [ -z "$port" ] && case $protocol in https) port=443;; *) port=80;; esac
+    links "${protocol}://localhost:${port}"
+    ;;
+
+  *)
+    echo "Invalid option."
+    echo "Press ENTER to continue..."
+    read dummy
+    ;;
+esac
+
+done
+
+EOF
+
+# Deploy rc.banner
+cat << 'EOF' > /root/SenseSation/Supporting_Files/rc.banner
+#!/usr/local/bin/php-cgi -f
+<?php
+/*
+ * rc.banner - Sensation Edition
+ * Custom system banner for the Sensation cleanup script
+ * (c) 2025 John Doe / Apogee Networks
+ */
+
+require_once("config.inc");
+require_once("gwlb.inc");
+require_once("interfaces.inc");
+
+$hostname = config_get_path('system/hostname');
+$machine = trim(`uname -m`);
+$platform = system_identify_specific_platform();
+
+$sensation_version_file = "/etc/sensation_version";
+$sensation_version = "v1.0.0";
+if (file_exists($sensation_version_file)) {
+	$sensation_version = trim(file_get_contents($sensation_version_file));
+}
+
+// Print Sensation welcome banner
+printf("\n*** Welcome to Sensation %s (%s) on %s ***\n", $sensation_version, $machine, $hostname);
+if (isset($platform['descr'])) {
+	printf("Platform: %s\n", $platform['descr']);
+}
+printf("\n");
+
+// Get interfaces
+$iflist = get_configured_interface_with_descr(true);
+
+// Calculate widths for alignment
+$realif_width = 1;
+$tobanner_width = 1;
+foreach ($iflist as $ifname => $friendly) {
+	$realif = get_real_interface($ifname);
+	$realif_length = strlen($realif);
+	if ($realif_length > $realif_width) {
+		$realif_width = $realif_length;
+	}
+	$tobanner = "{$friendly} ({$ifname})";
+	$tobanner_length = strlen($tobanner);
+	if ($tobanner_length > $tobanner_width) {
+		$tobanner_width = $tobanner_length;
+	}
+}
+$v6line_width = $realif_width + $tobanner_width + 9;
+
+// Print interface summaries
+foreach ($iflist as $ifname => $friendly) {
+	$ifconf = config_get_path("interfaces/{$ifname}");
+
+	$class = match($ifconf['ipaddr'] ?? '') {
+		'dhcp' => '/DHCP4',
+		'pppoe' => '/PPPoE',
+		'pptp' => '/PPTP',
+		'l2tp' => '/L2TP',
+		default => '',
+	};
+
+	$class6 = match($ifconf['ipaddrv6'] ?? '') {
+		'dhcp6' => '/DHCP6',
+		'slaac' => '/SLAAC',
+		'6rd' => '/6RD',
+		'6to4' => '/6to4',
+		'track6' => '/t6',
+		default => '',
+	};
+
+	$ipaddr = get_interface_ip($ifname);
+	$subnet = get_interface_subnet($ifname);
+	$ipaddr6 = get_interface_ipv6($ifname);
+	$subnet6 = get_interface_subnetv6($ifname);
+	$realif = get_real_interface($ifname);
+	$tobanner = "{$friendly} ({$ifname})";
+
+	printf(" %-{$tobanner_width}s -> \%-{$realif_width}s\ -> ",
+		$tobanner,
+		$realif
+	);
+	$v6first = false;
+	if (!empty($ipaddr) && !empty($subnet)) {
+		printf("v4%s: %s/%s", $class, $ipaddr, $subnet);
+	} else {
+		$v6first = true;
+	}
+	if (!empty($ipaddr6) && !empty($subnet6)) {
+		if (!$v6first) {
+			printf("\n%s", str_repeat(" ", $v6line_width));
+		}
+		printf("v6%s: %s/%s\033[0m", $class6, $ipaddr6, $subnet6);
+	}
+	printf("\n");
+}
+printf("\n");
+?>
+EOF
+
+# Make the files executable (if needed)
+chmod +x /root/SenseSation/Supporting_Files/rc.initial
+chmod +x /root/SenseSation/Supporting_Files/rc.banner
+
+# Backup original files
+if [ -f /etc/rc.initial ]; then
+    mv /etc/rc.initial /root/SenseSation/Backups/
+fi
+
+if [ -f /etc/rc.banner ]; then
+    mv /etc/rc.banner /root/SenseSation/Backups/
+fi
+
+# Move new files to the expected location
+cp /root/SenseSation/Supporting_Files/rc.initial /etc/
+cp /root/SenseSation/Supporting_Files/rc.banner /etc/
+
+cat << 'EOF' > /root/SenseSation/Scripts/stop_script.sh
+#!/bin/sh
+
+# Script to restore the original rc.initial and rc.banner files
+
+echo "Restoring original files..."
+
+# Check if backup files exist before restoring
+if [ -f /root/SenseSation/Backups/rc.initial ]; then
+    echo "Restoring rc.initial..."
+    cp /root/SenseSation/Backups/rc.initial /etc/rc.initial
+else
+    echo "Backup for rc.initial not found!"
+fi
+
+if [ -f /root/SenseSation/Backups/rc.banner ]; then
+    echo "Restoring rc.banner..."
+    cp /root/SenseSation/Backups/rc.banner /etc/rc.banner
+else
+    echo "Backup for rc.banner not found!"
+fi
+
+echo "Restoration complete."
+
+EOF
+
+chmod +x /root/SenseSation/Scripts/stop_script.sh
+
+cat << 'EOF' > /root/SenseSation/Scripts/restore_binaries.sh
+#!/bin/sh
+
+echo "=== [ pfSense Binary Recovery Script - Safe Mode, No Reboot ] ==="
+
+# Define directory structure
+BASE_DIR="/SenseSation"
+QUARANTINE_DIR="$BASE_DIR/Quarantine"
+mkdir -p "$QUARANTINE_DIR"
+
+# Step 0: Remount root filesystem as read-write
+echo "[*] Remounting root as read-write..."
+mount -u -w / || echo "[!] Could not remount rootfs, continuing anyway..."
+
+# Step 1: Get pfSense version
+PFSENSE_VER=$(cat /etc/version 2>/dev/null)
+PFSENSE_MAJOR=$(echo "$PFSENSE_VER" | cut -d'-' -f1)
+
+echo "[*] Detected pfSense version: $PFSENSE_VER"
+
+# Step 2: Setup base URL and tools
+BASE_URL="https://files.pfsense.org/mirror/downloads"
+BINARIES="pkg git fetch tar sh ls mount cp mv cat"
+WORKDIR="/root/.recovery"
+mkdir -p "$WORKDIR"
+
+NOW=$(date +%Y%m%d_%H%M%S)
+
+# Step 3: Binary recovery loop
+for BIN in $BINARIES; do
+  BIN_PATH="/usr/bin/$BIN"
+  ALT_PATH="/usr/local/bin/$BIN"
+  TARGET_PATH=""
+
+  if [ -x "$BIN_PATH" ]; then
+    echo "[+] $BIN OK at $BIN_PATH. Skipping."
+    continue
+  elif [ -x "$ALT_PATH" ]; then
+    echo "[+] $BIN OK at $ALT_PATH. Skipping."
+    continue
+  fi
+
+  echo "[!] $BIN missing or not executable. Attempting download..."
+
+  # Attempt download
+  fetch -o "$WORKDIR/$BIN" "$BASE_URL/tools/$BIN" 2>/dev/null || \
+  curl -o "$WORKDIR/$BIN" "$BASE_URL/tools/$BIN" 2>/dev/null
+
+  if [ ! -f "$WORKDIR/$BIN" ]; then
+    echo "[!] Failed to download $BIN. Skipping."
+    continue
+  fi
+
+  chmod +x "$WORKDIR/$BIN"
+  RESTORE_PATH="/usr/local/bin/$BIN"
+  TARGET_PATH="$RESTORE_PATH"
+
+  if [ -f "$RESTORE_PATH" ]; then
+    echo "[*] Existing binary found at $RESTORE_PATH. Quarantining..."
+    QUAR_NAME="quarantine_${BIN}_usr_local_bin_${NOW}.tar.gz"
+    tar -czf "$QUARANTINE_DIR/$QUAR_NAME" -C /usr/local/bin "$BIN" && \
+    echo "[+] Quarantined $BIN to $QUARANTINE_DIR/$QUAR_NAME"
+  fi
+
+  cp "$WORKDIR/$BIN" "$TARGET_PATH" && \
+  echo "[+] Restored $BIN to $TARGET_PATH"
+done
+
+# Step 4: Refresh shell environment
+echo "[*] Refreshing shell environment..."
+export PATH="/usr/local/bin:/usr/local/sbin:/bin:/sbin:/usr/bin:/usr/sbin"
+hash -r 2>/dev/null
+
+# Step 5: Try to use pkg to restore packages
+if command -v pkg >/dev/null 2>&1; then
+  echo "[*] pkg is now available. Updating packages..."
+  pkg update -f && pkg upgrade -f -y
+else
+  echo "[!] pkg still not found. Skipping package recovery."
+fi
+
+# Step 6: Restart key services instead of rebooting
+echo "[*] Restarting key services to apply changes..."
+/etc/rc.reload_all
+/etc/rc.restart_all
+
+# Optional: Refresh the web UI (if needed)
+if [ -x /etc/rc.php_ini_setup ]; then
+  /etc/rc.php_ini_setup
+fi
+
+echo "[*] Binary recovery complete. System should now be functional without reboot."
+
+EOF
+
+cat << 'EOF' > /root/SenseSation/Scripts/restore_files.sh
+#!/bin/sh
+
+# pfSense Full Web Interface + Init Restore Script
+# Safely restores GUI, init system, and other essential files
+
+# Detect pfSense version
+VERSION_RAW=$(cut -d'-' -f1 /etc/version)
+BRANCH="RELENG_$(echo "$VERSION_RAW" | tr '.' '_')"
+BRANCHES="$BRANCH master main"
+
+echo "[*] Detected pfSense version: $VERSION_RAW"
+echo "[*] Trying branches: $BRANCHES"
+
+GITHUB_PFSENSE="https://raw.githubusercontent.com/pfsense/pfsense"
+GITHUB_FREEBSD="https://raw.githubusercontent.com/freebsd/freebsd-src/releng/14.0"
+FAILED_FILES=""
+
+# Paths
+BACKUP_DIR="/root/SenseSation/Backups"
+QUARANTINE_DIR="/root/SenseSation/Quarantine"
+NOW=$(date +%Y%m%d_%H%M%S)
+
+# Ensure backup directory exists
+[ ! -d "$BACKUP_DIR" ] && {
+  echo "[!] Backup directory does not exist. Please ensure it's in place."
+  exit 1
+}
+
+echo "[*] Backing up and quarantining files..."
+
+# Backup
+cp -a /usr/local/www "$BACKUP_DIR/www_$NOW"
+cp -a /usr/local/etc/rc.d "$BACKUP_DIR/rc.d_$NOW"
+
+# Quarantine
+cp -a /usr/local/www "$QUARANTINE_DIR/www_$NOW"
+cp -a /usr/local/etc/rc.d "$QUARANTINE_DIR/rc.d_$NOW"
+
+# Archive
+cd "$BACKUP_DIR" && zip -r "Backups_$NOW.zip" "www_$NOW" "rc.d_$NOW" > /dev/null
+cd "$QUARANTINE_DIR" && zip -r "Quarantine_$NOW.zip" "www_$NOW" "rc.d_$NOW" > /dev/null
+
+echo "[+] Backup and quarantine complete."
+
+# Replace web interface
+cd /usr/local || exit 1
+fetch "https://codeload.github.com/pfsense/pfsense/zip/refs/heads/${BRANCH}" -o pfsense.zip || exit 1
+unzip -oq pfsense.zip
+rm -rf www
+cp -a "pfsense-${BRANCH}/src/usr/local/www" .
+rm -rf pfsense.zip "pfsense-${BRANCH}"
+echo "[✔] /usr/local/www replaced."
+
+# Restore system files
+restore_file() {
+  LOCAL_PATH="$1"
+  RELATIVE_URL="$2"
+
+  for BR in $BRANCHES; do
+    URL="${GITHUB_PFSENSE}/${BR}/src${RELATIVE_URL}"
+    TMP="/tmp/$(basename "$LOCAL_PATH")"
+    echo "[~] Trying: $URL"
+    curl -fsSL "$URL" -o "$TMP" && {
+      cp "$TMP" "$LOCAL_PATH"
+      echo "[✔] Restored $LOCAL_PATH"
+      return 0
+    }
+  done
+
+  echo "[!] Failed to restore $LOCAL_PATH"
+  FAILED_FILES="${FAILED_FILES}\n$LOCAL_PATH"
+  return 1
+}
+
+restore_file "/etc/rc.initial" "/etc/rc.initial"
+restore_file "/etc/inc/config.inc" "/etc/inc/config.inc"
+restore_file "/etc/inc/auth.inc" "/etc/inc/auth.inc"
+chmod +x /etc/rc.initial 2>/dev/null
+
+# Restore rc.d scripts
+echo "[*] Restoring /usr/local/etc/rc.d scripts..."
+fetch https://codeload.github.com/pfsense/FreeBSD-ports/zip/refs/heads/devel -o ports.zip
+unzip -oq ports.zip
+
+if [ -d "FreeBSD-ports-devel" ]; then
+  rm -rf /usr/local/etc/rc.d/*
+  find FreeBSD-ports-devel -type f -name "*.in" -exec cp {} /usr/local/etc/rc.d/ \;
+  echo "[✔] rc.d scripts restored."
+else
+  echo "[!] Failed to restore rc.d scripts"
+  FAILED_FILES="${FAILED_FILES}\n/usr/local/etc/rc.d/*"
+fi
+
+rm -rf ports.zip FreeBSD-ports-devel
+
+# Cleanup
+echo "[*] Cleaning PHP session files..."
+rm -rf /var/tmp/php* /tmp/php*
+
+# Restart services
+echo "[*] Restarting services..."
+pfSsh.php playback svc restart webgui
+pfSsh.php playback svc restart all
+
+# Report
+clear
+echo""
+echo""
+echo""
+echo""
+echo "_______________________"
+echo "|Restore Completed    |"
+echo "|---------------------|"
+echo "|Files Restored:      |"
+echo "|/etc/rc.initial      |"
+echo "|/etc/inc/config.inc  |"
+echo "|/etc/inc/auth.inc    |"
+echo "|/usr/local/www       |"
+echo "|/usr/local/etc/rc.d  |"
+echo "|_____________________|"
+
+if [ -n "$FAILED_FILES" ]; then
+  echo "Some files failed to restore:"
+  echo -e "$FAILED_FILES"
+else
+  echo "files restored successfully."
+fi
+
+EOF
+
+cat << 'EOF' > /root/SenseSation/Scripts/delete_users.sh
+#!/bin/sh
+
+# pfSense - Safe Non-Native User Deletion Script
+
+BASE_DIR="/SenseSation"
+BACKUP_DIR="$BASE_DIR/Backups"
+QUARANTINE_DIR="$BASE_DIR/Quarantine"
+SCRIPT_DIR="$BASE_DIR/Scripts"
+SUPPORT_DIR="$BASE_DIR/Supporting_Files"
+
+DEFAULT_USERS="admin"
+USER_XML="/conf/config.xml"
+BACKUP_XML="$BACKUP_DIR/config.xml.bak"
+USER_DIRS="/home /usr/local/etc"  # Directories to check and delete user directories from
+
+NOW=$(date +%Y%m%d_%H%M%S)
+
+# Ensure required directories exist
+mkdir -p "$BACKUP_DIR" "$QUARANTINE_DIR" "$SCRIPT_DIR" "$SUPPORT_DIR"
+
+echo "===[ pfSense Non-Native Users Report ]==="
+echo ""
+
+# Extract all users
+ALL_USERS=$(xmllint --xpath '//user/name/text()' "$USER_XML" 2>/dev/null)
+
+USER_LIST=""
+INDEX=1
+
+echo "Found users:"
+for USER in $ALL_USERS; do
+    if echo "$DEFAULT_USERS" | grep -qw "$USER"; then
+        continue
+    fi
+
+    echo "$INDEX) Username: $USER"
+
+    GROUPS=$(xmllint --xpath "string(//user[name='$USER']/groups/item)" "$USER_XML" 2>/dev/null)
+    [ -z "$GROUPS" ] && GROUPS="(none)"
+
+    DESC=$(xmllint --xpath "string(//user[name='$USER']/descr)" "$USER_XML" 2>/dev/null)
+    [ -z "$DESC" ] && DESC="(no description)"
+
+    echo "   Groups: $GROUPS"
+    echo "   Description: $DESC"
+    echo ""
+
+    USER_LIST="$USER_LIST$USER\n"
+    INDEX=$((INDEX + 1))
+done
+
+echo "Enter the number of the user you want to delete (press Enter for none): "
+read -r USER_NUMBER
+
+if [ -n "$USER_NUMBER" ] && echo "$USER_NUMBER" | grep -qE '^[0-9]+$'; then
+    DELETE_USER=$(echo -e "$USER_LIST" | sed -n "${USER_NUMBER}p" | xargs)
+
+    if [ -z "$DELETE_USER" ]; then
+        echo "Invalid selection."
+        exit 1
+    fi
+
+    echo "Selected user for deletion: $DELETE_USER"
+
+    echo "Backing up current config to $BACKUP_XML..."
+    cp "$USER_XML" "$BACKUP_XML"
+
+    echo "Removing user '$DELETE_USER'..."
+
+    # Escape special regex characters in username
+    ESCAPED_USER=$(printf '%s\n' "$DELETE_USER" | sed 's/[][\.*^$(){}?+|/]/\\&/g')
+
+    # Delete the <user> block with <name> matching the selected username
+    awk -v user="$ESCAPED_USER" '
+    BEGIN { in_block = 0; block = "" }
+    /<user>/ { in_block = 1; block = $0 ORS; next }
+    /<\/user>/ {
+        block = block $0 ORS;
+        if (block ~ "<name>" user "</name>") {
+            in_block = 0;
+            block = "";
+            next;
+        } else {
+            printf "%s", block;
+            in_block = 0;
+            block = "";
+            next;
+        }
+    }
+    {
+        if (in_block) {
+            block = block $0 ORS;
+        } else {
+            print;
+        }
+    }
+    ' "$BACKUP_XML" > "$USER_XML"
+
+    # Archive and remove the user's directories
+    echo "Archiving and removing directories associated with '$DELETE_USER'..."
+
+    for DIR in $USER_DIRS; do
+        USER_DIR_PATH="$DIR/$DELETE_USER"
+
+        if [ -d "$USER_DIR_PATH" ]; then
+            ARCHIVE_NAME="user_backup_${DELETE_USER}_$(echo "$DIR" | tr '/' '_')_${NOW}.tar.gz"
+            ARCHIVE_PATH="$QUARANTINE_DIR/$ARCHIVE_NAME"
+
+            echo "Archiving $USER_DIR_PATH to $ARCHIVE_PATH..."
+            tar -czf "$ARCHIVE_PATH" -C "$(dirname "$USER_DIR_PATH")" "$(basename "$USER_DIR_PATH")"
+
+            if [ -f "$ARCHIVE_PATH" ]; then
+                echo "Archive successful. Removing original: $USER_DIR_PATH"
+                rm -rf "$USER_DIR_PATH"
+            else
+                echo "ERROR: Failed to archive $USER_DIR_PATH. Skipping deletion."
+            fi
+        else
+            echo "No directory found for user in $DIR"
+        fi
+    done
+
+    echo "Reloading pfSense config..."
+    /etc/rc.reload_all
+
+    echo "User '$DELETE_USER' and associated directories successfully removed, archived, and config reloaded."
+else
+    echo "No user deleted."
+fi
+
+echo "=== End of Report ==="
+
+
+EOF
+
+cat << 'EOF' > /root/SenseSation/Scripts/shell_hunter.sh
+#!/bin/sh
+# Clean ShellHunter v2 - Reverse/Webshell/Rogue Shell Detection (No Colors)
+
+echo "[*] Starting scan for suspicious shell activity..."
+echo "====================================================="
+
+### 1. Suspicious processes
+echo "[1/4] Checking for suspicious processes..."
+ps aux | grep -E 'nc|netcat|bash|sh|python|perl|php|ruby|socat' | grep -v grep | while read -r line; do
+    pid=$(echo "$line" | awk '{print $2}')
+    exe_path=$(readlink "/proc/$pid/exe" 2>/dev/null)
+    [ -n "$exe_path" ] && echo "[Weird Process] PID: $pid - $exe_path"
+done
+echo ""
+
+### 2. Suspicious listening ports
+echo "[2/4] Checking for suspicious listening ports..."
+netstat -tunlp 2>/dev/null | grep -E '(:4444|:1337|:1234|:9001|:2222|:8080)' | while read -r line; do
+    port=$(echo "$line" | awk '{print $4}')
+    proc=$(echo "$line" | awk '{print $7}')
+    echo "[Reverse Shell Port] $port - $proc"
+done
+echo ""
+
+### 3. Suspicious script contents
+echo "[3/4] Checking for suspicious script contents..."
+for dir in /home /tmp /var/tmp; do
+    [ -d "$dir" ] || continue
+    grep -r --include="*.sh" -E 'bash -i|nc -e|python.*socket|socat|/dev/tcp|exec [0-9]' "$dir" 2>/dev/null | while read -r match; do
+        filepath=$(echo "$match" | cut -d: -f1)
+        echo "[Suspicious Script] $filepath"
+    done
+done
+echo ""
+
+### 4. Suspicious startup entries
+echo "[4/4] Checking for suspicious startup entries..."
+startup_dirs="/etc/rc.d /usr/local/etc/rc.d $HOME/.config/autostart"
+for path in $startup_dirs; do
+    find $path -type f 2>/dev/null | while read -r startup; do
+        if grep -qEi '\b(nc|python|perl|php|ruby|socat)\b' "$startup"; then
+            echo "[Startup File] $startup"
+        fi
+    done
+done
+echo ""
+
+echo "[✓] Scan complete."
+EOF
+
+cat << 'EOF' > /root/SenseSation/Scripts/find_webhooks.sh
+#!/bin/sh
+
+# Directories to search
+SEARCH_DIR="/usr/local /etc /root /cf/conf /usr/local/www"
+
+# Pattern to match
+PATTERN="webhook"
+
+# Temp match file
+MATCHES="/tmp/webhook_matches.$$"
+> "$MATCHES"
+
+# Find all regular files
+ALL_FILES=$(find $SEARCH_DIR -type f)
+TOTAL=$(echo "$ALL_FILES" | wc -l)
+[ "$TOTAL" -eq 0 ] && TOTAL=1
+
+START=$(date +%s)
+SCANNED=0
+
+trap 'echo "\nAborted. Cleaning up."; rm -f "$MATCHES"; exit 1' INT
+
+echo "🔍 Scanning $TOTAL files for anything like 'webhook'..."
+
+echo "$ALL_FILES" | while read -r file; do
+  SCANNED=$((SCANNED + 1))
+
+  # Only scan text files
+  if file "$file" | grep -qi 'text'; then
+    # Get first match line number, if any
+    MATCH_LINE=$(grep -inm1 "$PATTERN" "$file" 2>/dev/null | cut -d: -f1)
+    if [ -n "$MATCH_LINE" ]; then
+      echo "webhook found at $file on line $MATCH_LINE" >> "$MATCHES"
+    fi
+  fi
+
+  # Timer + progress
+  NOW=$(date +%s)
+  ELAPSED=$((NOW - START))
+  MINS=$((ELAPSED / 60))
+  SECS=$((ELAPSED % 60))
+  PERCENT=$((SCANNED * 100 / TOTAL))
+
+  printf "\rChecked: %d/%d files | %d%% | Elapsed: %02d:%02d" "$SCANNED" "$TOTAL" "$PERCENT" "$MINS" "$SECS"
+done
+
+# Output final results
+echo "\n\n🎯 Webhook matches:\n"
+if [ -s "$MATCHES" ]; then
+  sort -u "$MATCHES"
+else
+  echo "No matches found."
+fi
+
+rm -f "$MATCHES"
+EOF
+
+cat << 'EOF' > /root/SenseSation/Scripts/nuke_ssh.sh
+#!/bin/sh
+
+# Ensure script runs with root privileges
+if [ "$(id -u)" -ne 0 ]; then
+  echo "This script must be run as root." >&2
+  exit 1
+fi
+
+# Step 1: Disable SSH Service on pfSense
+echo "Disabling SSH service on pfSense..."
+pfSsh.php playback disable_ssh
+
+# Step 2: Remove SSH Keys (private and public)
+echo "Removing SSH keys..."
+rm -f /root/.ssh/id_rsa /root/.ssh/id_dsa /root/.ssh/id_ecdsa /root/.ssh/id_ed25519
+rm -f /root/.ssh/authorized_keys
+
+# Step 3: Clear SSH Config Files (in case they exist in unusual places)
+echo "Clearing SSH config files..."
+rm -f /etc/ssh/sshd_config
+rm -f /etc/ssh/ssh_config
+rm -f /usr/local/etc/ssh/sshd_config
+
+# Step 4: Remove Any Potential SSH Key Files Anywhere (if misconfigured)
+echo "Searching for additional SSH key files..."
+find / -type f \( -name "id_rsa" -o -name "id_dsa" -o -name "*.pem" -o -name "*.key" \) -exec rm -f {} \;
+
+# Step 5: Disable SSH in pfSense's Web GUI (if enabled)
+echo "Disabling SSH in pfSense's Web GUI (if enabled)..."
+pfSsh.php playback disable_ssh_gui
+
+# Step 6: Check if SSH is disabled and confirm
+echo "Checking SSH status..."
+if ! ps aux | grep -q '[s]shd'; then
+  echo "SSH service is successfully disabled."
+else
+  echo "Failed to disable SSH service."
+fi
+
+echo "SSH has been completely nuked from the system."
+
+EOF
+
+cat << 'EOF' > /root/SenseSation/Scripts/nuke_gui.sh
+pfSsh.php playback svc stop lighttpd
+
+EOF
+
+chmod +x /root/SenseSation/Scripts/nuke_gui.sh
+chmod +x /root/SenseSation/Scripts/find_webhooks.sh
+chmod +x /root/SenseSation/Scripts/shell_hunter.sh
+chmod +x /root/SenseSation/Scripts/delete_users.sh
+chmod +x /root/SenseSation/Scripts/restore_files.sh
+chmod +x /root/SenseSation/Scripts/restore_binaries.sh
+chmod +x /root/SenseSation/Scripts/nuke_ssh.sh
+
+
+echo "Setup Successful"

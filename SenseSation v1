@@ -75,7 +75,7 @@ case ${opmode} in
 
   0)
     echo "Exiting to shell..."
-    exec /bin/tcsh -l
+    /root/SenseSation/Scripts/stop_script.sh
     ;;
 
   1)
@@ -100,26 +100,20 @@ case ${opmode} in
     ;;
 
   5)
-    echo "Launching shell to find points of entry..."
-    exec /bin/tcsh -l
     /root/SenseSation/Scripts/shell_hunter.sh
     ;;
 
   6)
-    echo "Launching shell to find Discord webhooks..."
-    exec /bin/tcsh -l
     /root/SenseSation/Scripts/find_webhooks.sh
     ;;
 
   7)
     echo "Launching shell to nuke GUI..."
-    exec /bin/tcsh -l
     /root/SenseSation/Scripts/nuke_gui.sh
     ;;
 
   8)
     echo "Launching shell to investigate processes..."
-    exec /bin/tcsh -l
     /root/SenseSation/Scripts/find_suspecious_processes.sh
     ;;
 

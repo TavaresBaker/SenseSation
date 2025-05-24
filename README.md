@@ -11,12 +11,12 @@ Even with that hiccup, I maintained 97% uptime for the router. It was down for o
 
 ## Recommendation: 
 If you suspect your device has been compromised—especially in a home environment—your best option is to reinstall the operating system.
-For business-critical environments, download the scripts, disconnect the WAN interface, and proceed with caution. Some downtime is better than permanent downtime.
+For business-critical environments, download the scripts, and run it. I designed it with uptime in mind but that should not discourage you from shutting down service when applicable.
 
 ## What SenseSation Does:
 
 - Creates necessary directories for use during cleanup
-- Replaces rc.initial with a modified version that presents a menu of cleanup options
-- Automatically restores the original rc.initial if the script is interrupted
+- Replaces the console menu with a modified version that presents cleanup options
+- Automatically restores the original console menu if the script is interrupted
 - Offers staged cleanup procedures tailored to your situation
 - Backs up and/or quarantines any file it modifies

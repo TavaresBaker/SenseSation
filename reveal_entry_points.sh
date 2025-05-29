@@ -1,5 +1,5 @@
 #!/bin/sh
-# Clean ShellHunter v2 - Reverse/Webshell/Rogue Shell Detection (No Colors)
+# Script to find Reverse, Web, and rouge shell sessions. 
 
 echo "[*] Starting scan for suspicious shell activity..."
 echo "====================================================="

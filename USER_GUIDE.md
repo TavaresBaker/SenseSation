@@ -14,7 +14,8 @@ fetch https://raw.githubusercontent.com/TavaresBaker/SenseSation/refs/heads/main
 
 1. Go to the GitHub repo or any source where the script is hosted and copy it.
 2. Log in to the web GUI and go to **Diagnostics > Edit File**.
-3. Paste the script into a blank file and save it.
+3. You can also SSH into the firewall and create a file.
+4. Paste the script into a blank file and save it.
 
 ## Running It
 

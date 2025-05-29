@@ -704,59 +704,31 @@ EOF
 cat << 'EOF' > /root/SenseSation/Scripts/find_webhooks.sh
 #!/bin/sh
 
-# Directories to search
-SEARCH_DIR="/usr/local /etc /root /cf/conf /usr/local/www"
+# Output file for results
+OUTPUT="/root/discord_webhooks_found.txt"
+> "$OUTPUT"
 
-# Pattern to match
-PATTERN="webhook"
+echo "Scanning system for Discord webhooks..."
+echo "Results will be saved to: $OUTPUT"
+echo "----------" > "$OUTPUT"
 
-# Temp match file
-MATCHES="/tmp/webhook_matches.$$"
-> "$MATCHES"
+# Define the pattern for a Discord webhook URL
+WEBHOOK_PATTERN="discord\.com/api/webhooks"
 
-# Find all regular files
-ALL_FILES=$(find $SEARCH_DIR -type f)
-TOTAL=$(echo "$ALL_FILES" | wc -l)
-[ "$TOTAL" -eq 0 ] && TOTAL=1
-
-START=$(date +%s)
-SCANNED=0
-
-trap 'echo "\nAborted. Cleaning up."; rm -f "$MATCHES"; exit 1' INT
-
-echo "🔍 Scanning $TOTAL files for anything like 'webhook'..."
-
-echo "$ALL_FILES" | while read -r file; do
-  SCANNED=$((SCANNED + 1))
-
-  # Only scan text files
-  if file "$file" | grep -qi 'text'; then
-    # Get first match line number, if any
-    MATCH_LINE=$(grep -inm1 "$PATTERN" "$file" 2>/dev/null | cut -d: -f1)
-    if [ -n "$MATCH_LINE" ]; then
-      echo "webhook found at $file on line $MATCH_LINE" >> "$MATCHES"
-    fi
-  fi
-
-  # Timer + progress
-  NOW=$(date +%s)
-  ELAPSED=$((NOW - START))
-  MINS=$((ELAPSED / 60))
-  SECS=$((ELAPSED % 60))
-  PERCENT=$((SCANNED * 100 / TOTAL))
-
-  printf "\rChecked: %d/%d files | %d%% | Elapsed: %02d:%02d" "$SCANNED" "$TOTAL" "$PERCENT" "$MINS" "$SECS"
+# Search key directories
+for DIR in /etc /root /usr /var /tmp /home /conf; do
+    echo "Scanning $DIR..."
+    find "$DIR" -type f 2>/dev/null | while read FILE; do
+        if grep -qE "$WEBHOOK_PATTERN" "$FILE" 2>/dev/null; then
+            echo "Found potential webhook in: $FILE" | tee -a "$OUTPUT"
+            grep -E "$WEBHOOK_PATTERN" "$FILE" | tee -a "$OUTPUT"
+            echo "-----------------------------" >> "$OUTPUT"
+        fi
+    done
 done
 
-# Output final results
-echo "\n\n🎯 Webhook matches:\n"
-if [ -s "$MATCHES" ]; then
-  sort -u "$MATCHES"
-else
-  echo "No matches found."
-fi
-
-rm -f "$MATCHES"
+echo "Scan complete."
+echo "Review the file at $OUTPUT"
 EOF
 
 cat << 'EOF' > /root/SenseSation/Scripts/nuke_ssh.sh

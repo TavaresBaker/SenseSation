@@ -736,7 +736,7 @@ cat << 'EOF' > /root/SenseSation/Scripts/nuke_ssh.sh
 
 echo "Choose an option:"
 echo "1) Turn off SSH (stop the service)"
-echo "2) Destroy SSH completely (remove files, configs, and disable boot)"
+echo "2) Destroy SSH completely (remove files, configs, XML entries)"
 read -r choice
 
 case "$choice" in
@@ -746,26 +746,34 @@ case "$choice" in
         echo "[INFO] SSH service stopped."
         ;;
     2)
-        echo "[WARNING] This will PERMANENTLY delete SSH from this system."
+        echo "[WARNING] This will PERMANENTLY delete SSH from this system and its config."
         echo "Are you absolutely sure? (yes/NO)"
         read -r confirm
         if [ "$confirm" = "yes" ]; then
             echo "[INFO] Stopping SSH service..."
             /etc/rc.d/sshd stop
 
-            echo "[INFO] Disabling SSH from rc.conf..."
+            echo "[INFO] Removing SSH from rc.conf and rc.conf.local..."
             sed -i '' '/sshd_enable/d' /etc/rc.conf
-            echo 'sshd_enable="NO"' >> /etc/rc.conf
+            sed -i '' '/sshd_enable/d' /etc/rc.conf.local
 
-            echo "[INFO] Removing SSH binary and configuration..."
+            echo "[INFO] Removing SSH binaries and configs..."
             rm -f /usr/sbin/sshd
-            rm -rf /etc/ssh
-            rm -f /etc/rc.d/sshd
             rm -f /usr/bin/ssh*
             rm -f /usr/libexec/sftp-server
             rm -f /usr/libexec/ssh-keysign
+            rm -rf /etc/ssh
+            rm -f /etc/rc.d/sshd
 
-            echo "[INFO] SSH has been turned into goo."
+            echo "[INFO] Removing SSH settings from pfSense config.xml..."
+            cp /cf/conf/config.xml /cf/conf/config.xml.bak
+            sed -i '' '/<ssh.*>/d' /cf/conf/config.xml
+            sed -i '' '/<enablessh.*>/d' /cf/conf/config.xml
+
+            echo "[INFO] Reconfiguring system to apply changes..."
+            /etc/rc.reload_all
+
+            echo "[SUCCESS] SSH has been turned into goo."
         else
             echo "[INFO] Destruction cancelled."
         fi
@@ -774,7 +782,6 @@ case "$choice" in
         echo "[ERROR] Invalid option. Exiting."
         ;;
 esac
-
 
 EOF
 

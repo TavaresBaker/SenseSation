@@ -56,7 +56,7 @@ echo ""
 echo " 0) Exit                                1) Shell"
 echo " 2) Restore Binaries                    3) Restore Files"
 echo " 4) Find Added Users                    5) Find Points of Entry"
-echo " 6) Find Webhooks                       7) Nuke Web Console"
+echo " 6) Find Webhooks                       7) Nuke SSH"
 echo " 8) Find Suspicious Processes           9) Deploy PFBlocker"
 echo ""
 echo ""
@@ -108,8 +108,8 @@ case ${opmode} in
     ;;
 
   7)
-    echo "Launching shell to nuke GUI..."
-    /root/SenseSation/Scripts/nuke_gui.sh
+    echo "Launching shell to nuke SSH..."
+    /root/SenseSation/Scripts/nuke_ssh.sh
     ;;
 
   8)
@@ -734,44 +734,47 @@ EOF
 cat << 'EOF' > /root/SenseSation/Scripts/nuke_ssh.sh
 #!/bin/sh
 
-# Ensure script runs with root privileges
-if [ "$(id -u)" -ne 0 ]; then
-  echo "This script must be run as root." >&2
-  exit 1
-fi
+echo "Choose an option:"
+echo "1) Turn off SSH (stop the service)"
+echo "2) Destroy SSH completely (remove files, configs, and disable boot)"
+read -r choice
 
-# Step 1: Disable SSH Service on pfSense
-echo "Disabling SSH service on pfSense..."
-pfSsh.php playback disable_ssh
+case "$choice" in
+    1)
+        echo "[INFO] Stopping SSH service..."
+        /etc/rc.d/sshd stop
+        echo "[INFO] SSH service stopped."
+        ;;
+    2)
+        echo "[WARNING] This will PERMANENTLY delete SSH from this system."
+        echo "Are you absolutely sure? (yes/NO)"
+        read -r confirm
+        if [ "$confirm" = "yes" ]; then
+            echo "[INFO] Stopping SSH service..."
+            /etc/rc.d/sshd stop
 
-# Step 2: Remove SSH Keys (private and public)
-echo "Removing SSH keys..."
-rm -f /root/.ssh/id_rsa /root/.ssh/id_dsa /root/.ssh/id_ecdsa /root/.ssh/id_ed25519
-rm -f /root/.ssh/authorized_keys
+            echo "[INFO] Disabling SSH from rc.conf..."
+            sed -i '' '/sshd_enable/d' /etc/rc.conf
+            echo 'sshd_enable="NO"' >> /etc/rc.conf
 
-# Step 3: Clear SSH Config Files (in case they exist in unusual places)
-echo "Clearing SSH config files..."
-rm -f /etc/ssh/sshd_config
-rm -f /etc/ssh/ssh_config
-rm -f /usr/local/etc/ssh/sshd_config
+            echo "[INFO] Removing SSH binary and configuration..."
+            rm -f /usr/sbin/sshd
+            rm -rf /etc/ssh
+            rm -f /etc/rc.d/sshd
+            rm -f /usr/bin/ssh*
+            rm -f /usr/libexec/sftp-server
+            rm -f /usr/libexec/ssh-keysign
 
-# Step 4: Remove Any Potential SSH Key Files Anywhere (if misconfigured)
-echo "Searching for additional SSH key files..."
-find / -type f \( -name "id_rsa" -o -name "id_dsa" -o -name "*.pem" -o -name "*.key" \) -exec rm -f {} \;
+            echo "[INFO] SSH has been turned into goo."
+        else
+            echo "[INFO] Destruction cancelled."
+        fi
+        ;;
+    *)
+        echo "[ERROR] Invalid option. Exiting."
+        ;;
+esac
 
-# Step 5: Disable SSH in pfSense's Web GUI (if enabled)
-echo "Disabling SSH in pfSense's Web GUI (if enabled)..."
-pfSsh.php playback disable_ssh_gui
-
-# Step 6: Check if SSH is disabled and confirm
-echo "Checking SSH status..."
-if ! ps aux | grep -q '[s]shd'; then
-  echo "SSH service is successfully disabled."
-else
-  echo "Failed to disable SSH service."
-fi
-
-echo "SSH has been completely nuked from the system."
 
 EOF
 

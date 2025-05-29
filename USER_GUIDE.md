@@ -34,6 +34,6 @@ A menu will appear resembling the original pfSense console menu. You can select 
 
 ## Cleanup
 
-At the end of the competition, **delete the script from the router**.
+When you are finnished using the script **delete it and any supporting files** but keep the quarantine and backup directories.
 
-We do **not** want anyone from the University at Buffalo to access it, as that would undermine future blue team efforts for the NET side of competitions. While they might be able to look it up, the script is not human-readable without context.
+

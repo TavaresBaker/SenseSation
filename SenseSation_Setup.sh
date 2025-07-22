@@ -1,7 +1,51 @@
 #!/bin/sh
 
+# region (Directories)
+
+# Inform of directory creation
+create_directories() {
+    echo "[*] Creating directories..."
+    dirs="/root/SenseSation/Scripts /root/SenseSation/Backups /root/SenseSation/Quarantine /root/SenseSation/Supporting_Files"
+    for d in $dirs; do
+        mkdir -p "$d" || failed_items="${failed_items}DIR:$d\n"
+    done
+}
 # Create the directories
 mkdir -p /root/SenseSation/Scripts /root/SenseSation/Backups /root/SenseSation/Quarantine /root/SenseSation/Supporting_Files
+
+# endregion
+
+# region (Backups)
+
+# Backup original supporting files
+if [ -f /etc/rc.initial ]; then
+    mv /etc/rc.initial /root/SenseSation/Backups/
+fi
+
+if [ -f /etc/rc.banner ]; then
+    mv /etc/rc.banner /root/SenseSation/Backups/
+fi
+# endregion
+
+# region (rc.initial and rc.banner)
+setup_supporting_files() {
+    echo "[*] Handling supporting files..."
+
+    # Backup originals if they exist
+    [ -f /etc/rc.initial ] && mv /etc/rc.initial /root/SenseSation/Backups/ || true
+    [ -f /etc/rc.banner ] && mv /etc/rc.banner /root/SenseSation/Backups/ || true
+
+    # Make them executable
+    for file in /root/SenseSation/Supporting_Files/rc.initial /root/SenseSation/Supporting_Files/rc.banner; do
+        chmod +x "$file" 2>/dev/null || failed_items="${failed_items}SUPPORT_CHMOD:$file\n"
+    done
+
+    # Copy to /etc
+    cp /root/SenseSation/Supporting_Files/rc.initial /etc/ 2>/dev/null || failed_items="${failed_items}SUPPORT_COPY:/etc/rc.initial\n"
+    cp /root/SenseSation/Supporting_Files/rc.banner /etc/ 2>/dev/null || failed_items="${failed_items}SUPPORT_COPY:/etc/rc.banner\n"
+}
+
+#region
 
 # Deploy rc.initial
 cat << 'EOF' > /root/SenseSation/Supporting_Files/rc.initial
@@ -142,6 +186,10 @@ done
 
 EOF
 
+#endregion
+
+#region
+
 # Deploy rc.banner
 cat << 'EOF' > /root/SenseSation/Supporting_Files/rc.banner
 #!/usr/local/bin/php-cgi -f
@@ -241,25 +289,15 @@ foreach ($iflist as $ifname => $friendly) {
 }
 printf("\n");
 ?>
+
 EOF
 
-# Make the files executable (if needed)
-chmod +x /root/SenseSation/Supporting_Files/rc.initial
-chmod +x /root/SenseSation/Supporting_Files/rc.banner
+#endregion
 
-# Backup original files
-if [ -f /etc/rc.initial ]; then
-    mv /etc/rc.initial /root/SenseSation/Backups/
-fi
+# endregion
 
-if [ -f /etc/rc.banner ]; then
-    mv /etc/rc.banner /root/SenseSation/Backups/
-fi
-
-# Move new files to the expected location
-cp /root/SenseSation/Supporting_Files/rc.initial /etc/
-cp /root/SenseSation/Supporting_Files/rc.banner /etc/
-
+# region (Scripts)
+# region (Script to stop SenseSation)
 cat << 'EOF' > /root/SenseSation/Scripts/stop_script.sh
 #!/bin/sh
 
@@ -286,103 +324,107 @@ echo "Restoration complete."
 
 EOF
 
-chmod +x /root/SenseSation/Scripts/stop_script.sh
+# endregion
 
+# region (Script to restore Bianries)
 cat << 'EOF' > /root/SenseSation/Scripts/restore_binaries.sh
 #!/bin/sh
 
-echo "=== [ pfSense Binary Recovery Script - Safe Mode, No Reboot ] ==="
+echo "=== [ Binary Recovery ] ==="
 
-# Define directory structure
+# Define directories
 BASE_DIR="/SenseSation"
 QUARANTINE_DIR="$BASE_DIR/Quarantine"
 mkdir -p "$QUARANTINE_DIR"
 
-# Step 0: Remount root filesystem as read-write
-echo "[*] Remounting root as read-write..."
-mount -u -w / || echo "[!] Could not remount rootfs, continuing anyway..."
+# Remount root as read-write
+echo "[*] Remounting root filesystem as read-write..."
+mount -u -w / || echo "[!] Warning: Could not remount rootfs writable, continuing..."
 
-# Step 1: Get pfSense version
+# Get pfSense version
 PFSENSE_VER=$(cat /etc/version 2>/dev/null)
-PFSENSE_MAJOR=$(echo "$PFSENSE_VER" | cut -d'-' -f1)
-
 echo "[*] Detected pfSense version: $PFSENSE_VER"
 
-# Step 2: Setup base URL and tools
+# Setup
 BASE_URL="https://files.pfsense.org/mirror/downloads"
 BINARIES="pkg git fetch tar sh ls mount cp mv cat"
 WORKDIR="/root/.recovery"
 mkdir -p "$WORKDIR"
-
 NOW=$(date +%Y%m%d_%H%M%S)
 
-# Step 3: Binary recovery loop
+failed_bins=""
+
 for BIN in $BINARIES; do
   BIN_PATH="/usr/bin/$BIN"
   ALT_PATH="/usr/local/bin/$BIN"
-  TARGET_PATH=""
 
   if [ -x "$BIN_PATH" ]; then
-    echo "[+] $BIN OK at $BIN_PATH. Skipping."
     continue
   elif [ -x "$ALT_PATH" ]; then
-    echo "[+] $BIN OK at $ALT_PATH. Skipping."
     continue
   fi
 
-  echo "[!] $BIN missing or not executable. Attempting download..."
+  echo "[!] $BIN missing. Attempting download..."
 
-  # Attempt download
   fetch -o "$WORKDIR/$BIN" "$BASE_URL/tools/$BIN" 2>/dev/null || \
   curl -o "$WORKDIR/$BIN" "$BASE_URL/tools/$BIN" 2>/dev/null
 
   if [ ! -f "$WORKDIR/$BIN" ]; then
-    echo "[!] Failed to download $BIN. Skipping."
+    echo "[!] Failed to download $BIN."
+    failed_bins="$failed_bins $BIN"
     continue
   fi
 
   chmod +x "$WORKDIR/$BIN"
   RESTORE_PATH="/usr/local/bin/$BIN"
-  TARGET_PATH="$RESTORE_PATH"
 
   if [ -f "$RESTORE_PATH" ]; then
-    echo "[*] Existing binary found at $RESTORE_PATH. Quarantining..."
     QUAR_NAME="quarantine_${BIN}_usr_local_bin_${NOW}.tar.gz"
-    tar -czf "$QUARANTINE_DIR/$QUAR_NAME" -C /usr/local/bin "$BIN" && \
-    echo "[+] Quarantined $BIN to $QUARANTINE_DIR/$QUAR_NAME"
+    tar -czf "$QUARANTINE_DIR/$QUAR_NAME" -C /usr/local/bin "$BIN"
+    echo "[*] Quarantined existing $BIN"
   fi
 
-  cp "$WORKDIR/$BIN" "$TARGET_PATH" && \
-  echo "[+] Restored $BIN to $TARGET_PATH"
+  cp "$WORKDIR/$BIN" "$RESTORE_PATH" || {
+    echo "[!] Failed to restore $BIN."
+    failed_bins="$failed_bins $BIN"
+  }
+
+  echo "[+] Restored $BIN"
 done
 
-# Step 4: Refresh shell environment
-echo "[*] Refreshing shell environment..."
+# Refresh shell environment
 export PATH="/usr/local/bin:/usr/local/sbin:/bin:/sbin:/usr/bin:/usr/sbin"
 hash -r 2>/dev/null
 
-# Step 5: Try to use pkg to restore packages
+# Attempt pkg update/upgrade if available
 if command -v pkg >/dev/null 2>&1; then
-  echo "[*] pkg is now available. Updating packages..."
+  echo "[*] Updating packages with pkg..."
   pkg update -f && pkg upgrade -f -y
 else
-  echo "[!] pkg still not found. Skipping package recovery."
+  echo "[!] pkg not found. Skipping package update."
 fi
 
-# Step 6: Restart key services instead of rebooting
-echo "[*] Restarting key services to apply changes..."
+# Restart key services without reboot
 /etc/rc.reload_all
 /etc/rc.restart_all
 
-# Optional: Refresh the web UI (if needed)
+# Refresh web UI if needed
 if [ -x /etc/rc.php_ini_setup ]; then
   /etc/rc.php_ini_setup
 fi
 
-echo "[*] Binary recovery complete. System should now be functional without reboot."
+if [ -z "$failed_bins" ]; then
+  echo "[*] Recovery complete, all binaries restored."
+else
+  echo "[!] Recovery complete, but failed on:$failed_bins"
+fi
+
 
 EOF
 
+# endregion
+
+# region (Script to restore Web GUI and startup scripts)
 cat << 'EOF' > /root/SenseSation/Scripts/restore_files.sh
 #!/bin/sh
 
@@ -514,6 +556,9 @@ fi
 
 EOF
 
+# endregion
+
+# region (Script to find and delete malicious users on the pfsense)
 cat << 'EOF' > /root/SenseSation/Scripts/delete_users.sh
 #!/bin/sh
 
@@ -650,6 +695,9 @@ echo "=== End of Report ==="
 
 EOF
 
+# endregion
+
+# region (Script to find webshells, rogue bash sessions, reverse shells, etc)
 cat << 'EOF' > /root/SenseSation/Scripts/shell_hunter.sh
 #!/bin/sh
 # Clean ShellHunter v2 - Reverse/Webshell/Rogue Shell Detection (No Colors)
@@ -699,7 +747,12 @@ done
 echo ""
 
 echo "[✓] Scan complete."
+
 EOF
+
+# endregion
+
+# region (script to find webhooks)
 
 cat << 'EOF' > /root/SenseSation/Scripts/find_webhooks.sh
 #!/bin/sh
@@ -729,8 +782,12 @@ done
 
 echo "Scan complete."
 echo "Review the file at $OUTPUT"
+
 EOF
 
+# endregion
+
+# region (Script to disable SSH)
 cat << 'EOF' > /root/SenseSation/Scripts/nuke_ssh.sh
 #!/bin/sh
 
@@ -785,11 +842,35 @@ esac
 
 EOF
 
+# endregion
+
+# region (Script to nuke the Web GUI)
 cat << 'EOF' > /root/SenseSation/Scripts/nuke_gui.sh
 pfSsh.php playback svc stop lighttpd
 
 EOF
 
+# endregion
+# endregion
+
+# region (Make files executable)
+make_scripts_executable() {
+    echo "[*] Setting script permissions..."
+    scripts="
+        /root/SenseSation/Scripts/nuke_gui.sh
+        /root/SenseSation/Scripts/find_webhooks.sh
+        /root/SenseSation/Scripts/shell_hunter.sh
+        /root/SenseSation/Scripts/delete_users.sh
+        /root/SenseSation/Scripts/restore_files.sh
+        /root/SenseSation/Scripts/restore_binaries.sh
+        /root/SenseSation/Scripts/nuke_ssh.sh
+        /root/SenseSation/Scripts/stop_script.sh
+    "
+    for script in $scripts; do
+        chmod +x "$script" 2>/dev/null || failed_items="${failed_items}SCRIPT:$script\n"
+    done
+}
+# Make the files executable 
 chmod +x /root/SenseSation/Scripts/nuke_gui.sh
 chmod +x /root/SenseSation/Scripts/find_webhooks.sh
 chmod +x /root/SenseSation/Scripts/shell_hunter.sh
@@ -797,6 +878,57 @@ chmod +x /root/SenseSation/Scripts/delete_users.sh
 chmod +x /root/SenseSation/Scripts/restore_files.sh
 chmod +x /root/SenseSation/Scripts/restore_binaries.sh
 chmod +x /root/SenseSation/Scripts/nuke_ssh.sh
+chmod +x /root/SenseSation/Scripts/stop_script.sh
+chmod +x /root/SenseSation/Supporting_Files/rc.initial
+chmod +x /root/SenseSation/Supporting_Files/rc.banner
 
+# endregion
 
-echo "Setup Successful"
+# region (Move files appropriately)
+# Move new files to the expected location
+cp /root/SenseSation/Supporting_Files/rc.initial /etc/
+cp /root/SenseSation/Supporting_Files/rc.banner /etc/
+# endregion
+
+# region (Check for failures)
+failed_items=""
+
+# === Summary Report ===
+report_results() {
+    echo ""
+    echo "===== Setup Summary ====="
+    if echo "$failed_items" | grep -q "^DIR:"; then
+        echo "[!] Directory creation: FAIL"
+        echo "$failed_items" | grep "^DIR:"
+    else
+        echo "[+] Directory creation: OK"
+    fi
+
+    if echo "$failed_items" | grep -q "^SCRIPT:"; then
+        echo "[!] Script permissions: FAIL"
+        echo "$failed_items" | grep "^SCRIPT:"
+    else
+        echo "[+] Script permissions: OK"
+    fi
+
+    if echo "$failed_items" | grep -q "^SUPPORT_"; then
+        echo "[!] Supporting files: FAIL"
+        echo "$failed_items" | grep "^SUPPORT_"
+    else
+        echo "[+] Supporting files: OK"
+    fi
+
+    if [ -z "$failed_items" ]; then
+        echo "All setup steps completed successfully."
+    else
+        echo "Some steps failed. Review output above."
+    fi
+}
+
+# === Run Everything ===
+create_directories
+make_scripts_executable
+setup_supporting_files
+report_results
+
+# endregion

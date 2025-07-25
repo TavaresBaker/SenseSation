@@ -3,20 +3,24 @@
 ## Background:
 SenseSation is a collection of scripts designed to defend pfSense routers against cyber attacks.
 
-My name is Tavares Baker. At the time of writing this, I was a freshman in college preparing for the bi-annual University at Buffalo Lockdown competition. I created these scripts to automate and speed up the system-cleansing process, aiming to kick the red team off the router before they could cause significant damage. Unfortunately, the first draft of SenseSation wasn’t finished in time.
-
-Despite that, I was able to use many of the concepts and partial scripts during the competition. While they helped, they weren’t quite enough. I did manage to completely remove the red team from the router—aside from a brief moment when I was PWNed by a LAN machine. I’ve since learned from that experience.
-
-Even with that hiccup, I maintained 97% uptime for the router. It was down for only 8 minutes over 4.5 hours, 5 of which were from a manual reboot.
+My name is Tavares Baker. I am a sophomore in college preparing for the bi-annual University at Buffalo Lockdown competition. I created these scripts to automate and speed up the system-cleansing process, aiming to remove red teams prescence from the router before they can cause significant damage.
 
 ## Recommendation: 
-If you suspect your device has been compromised—especially in a home environment—your best option is to reinstall the operating system.
-For business-critical environments, download the scripts, and run it. I designed it with uptime in mind but that should not discourage you from shutting down service when applicable.
+SenseSation is designed mainly for cybersecurity competitions in which there is a pfSense firewall in the tapology. In said competitions, uptime is the number 1 priority so reinstalling the OS is not an option. If you can even remotely reinstall, DO IT, DO NOT USE THIS. There are programs/artifacts that SenseSation can not catch which can lead to reinfestation. If you can't afford to reinstall, welcome to my humble project!
 
 ## What SenseSation Does:
-
 - Creates necessary directories for use during cleanup
 - Replaces the console menu with a modified version that presents cleanup options
 - Automatically restores the original console menu if the script is interrupted
 - Offers staged cleanup procedures tailored to your situation
 - Backs up and/or quarantines any file it modifies
+
+- Repairs any necessary binaries which could have been corrupted or altered
+- Restores startup scripts and php files to break most web shells and some persistance
+- Finds all added users even hidden ones to manage privelages and permissions
+- Searches the filesystem for webhooks which can exfil information such as passwords
+- Scavenges for points of entry such as web shells, reverse shells, or rouge bash sessions
+- Disables ssh by removing the cooresponding files for maximum security
+- Automates the deployment of pfBlocker and Snort for quick and streamlined hardening
+- Searches the filesystem for randsomeware
+- Checks on active processes to find any suspecious activity

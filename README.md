@@ -9,11 +9,6 @@ My name is Tavares Baker. I am a sophomore in college preparing for the bi-annua
 SenseSation is designed mainly for cybersecurity competitions in which there is a pfSense firewall in the tapology. In said competitions, uptime is the number 1 priority so reinstalling the OS is not an option. If you can even remotely reinstall, DO IT, DO NOT USE THIS. There are programs/artifacts that SenseSation can not catch which can lead to reinfestation. If you can't afford to reinstall, welcome to my humble project!
 
 ## What SenseSation Does:
-- Creates necessary directories for use during cleanup
-- Replaces the console menu with a modified version that presents cleanup options
-- Automatically restores the original console menu if the script is interrupted
-- Offers staged cleanup procedures tailored to your situation
-- Backs up and/or quarantines any file it modifies
 
 - Repairs any necessary binaries which could have been corrupted or altered
 - Restores startup scripts and php files to break most web shells and some persistance
@@ -24,3 +19,6 @@ SenseSation is designed mainly for cybersecurity competitions in which there is 
 - Automates the deployment of pfBlocker and Snort for quick and streamlined hardening
 - Searches the filesystem for randsomeware
 - Checks on active processes to find any suspecious activity
+
+## How it works:
+Once the setup script is run, sensesation will create any necessary directories, create the files needed for the cleanup options, moves any files around including necessary backups, and ends by informing you of success/failure in this process. Once the setup script runs, return to the console menu and go in order from 2 upwards. If you are not cleaning up but rather doing initial config, you can skip most options.

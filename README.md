@@ -1,24 +1,44 @@
 # SenseSation
 
-## Background:
-SenseSation is a collection of scripts designed to defend pfSense routers against cyber attacks.
+## Background
 
-My name is Tavares Baker. I am a sophomore in college preparing for the bi-annual University at Buffalo Lockdown competition. I created these scripts to automate and speed up the system-cleansing process, aiming to remove red teams prescence from the router before they can cause significant damage.
+**SenseSation** is a collection of scripts designed to defend **pfSense routers** against cyber attacks.
 
-## Recommendation: 
-SenseSation is designed mainly for cybersecurity competitions in which there is a pfSense firewall in the tapology. In said competitions, uptime is the number 1 priority so reinstalling the OS is not an option. If you can even remotely reinstall, DO IT, DO NOT USE THIS. There are programs/artifacts that SenseSation can not catch which can lead to reinfestation. If you can't afford to reinstall, welcome to my humble project!
+My name is **Tavares Baker**, and I’m a sophomore in college preparing for the bi-annual **University at Buffalo Lockdown** competition. I created these scripts to **automate and accelerate the system-cleansing process**, aiming to remove red team presence from the router before they can cause serious damage.
 
-## What SenseSation Does:
+---
 
-- Repairs any necessary binaries which could have been corrupted or altered
-- Restores startup scripts and php files to break most web shells and some persistance
-- Finds all added users even hidden ones to manage privelages and permissions
-- Searches the filesystem for webhooks which can exfil information such as passwords
-- Scavenges for points of entry such as web shells, reverse shells, or rouge bash sessions
-- Disables ssh by removing the cooresponding files for maximum security
-- Automates the deployment of pfBlocker and Snort for quick and streamlined hardening
-- Searches the filesystem for randsomeware
-- Checks on active processes to find any suspecious activity
+## Recommendation
 
-## How it works:
-Once the setup script is run, sensesation will create any necessary directories, create the files needed for the cleanup options, moves any files around including necessary backups, and ends by informing you of success/failure in this process. Once the setup script runs, return to the console menu and go in order from 2 upwards. If you are not cleaning up but rather doing initial config, you can skip most options.
+**SenseSation** is intended primarily for **cybersecurity competitions** that involve a **pfSense firewall in the network topology**. In these environments, **uptime is the #1 priority**, and reinstalling the OS is often not an option.
+
+> **If you can reinstall, DO IT. DO NOT USE THIS.**
+
+There are programs and artifacts that **SenseSation cannot catch**, which can lead to reinfection. But if you **can’t afford to reinstall**, welcome to my humble project — let's make the best of a bad situation.
+
+---
+
+## What SenseSation Does
+
+- Repairs critical binaries that may have been corrupted or altered  
+- Restores startup scripts and PHP files to break most web shells and persistence  
+- Detects added users — even hidden ones — to manage privileges and permissions  
+- Searches the filesystem for webhooks that could exfiltrate sensitive data (e.g., passwords)  
+- Scavenges for entry points like web shells, reverse shells, or rogue bash sessions  
+- Disables SSH by removing associated config files for maximum security  
+- Automates the deployment of **pfBlockerNG** and **Snort** for rapid hardening  
+- Scans the filesystem for ransomware and malicious scripts  
+- Analyzes active processes for suspicious behavior  
+
+---
+
+## How It Works
+
+Once the setup script is run, **SenseSation** will:
+
+- Create the required directories  
+- Generate the core cleanup and utility scripts  
+- Move and back up essential files  
+- Conclude with a success or failure message  
+
+After the setup is complete, return to the **console menu** and run each cleanup step **in order starting from Option 2**. If you're just doing **initial configuration**, you can safely skip most of the cleanup-specific steps.

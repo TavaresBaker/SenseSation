@@ -5,19 +5,19 @@
 # Inform of directory creation
 create_directories() {
     echo "[*] Creating directories..."
-    dirs="/root/SenseSation/Scripts /root/SenseSation/Backups /root/SenseSation/Quarantine /root/SenseSation/Supporting_Files"
+    dirs="/root/SenseSation/Scripts /root/SenseSation/Backups /root/SenseSation/Quarantine /root/SenseSation/Resources"
     for d in $dirs; do
         mkdir -p "$d" || failed_items="${failed_items}DIR:$d\n"
     done
 }
 # Create the directories
-mkdir -p /root/SenseSation/Scripts /root/SenseSation/Backups /root/SenseSation/Quarantine /root/SenseSation/Supporting_Files
+mkdir -p /root/SenseSation/Scripts /root/SenseSation/Backups /root/SenseSation/Quarantine /root/SenseSation/Resources
 
 # endregion
 
 # region (Backups)
 
-# Backup original supporting files
+# Backup original Resources
 if [ -f /etc/rc.initial ]; then
     mv /etc/rc.initial /root/SenseSation/Backups/
 fi
@@ -28,27 +28,27 @@ fi
 # endregion
 
 # region (rc.initial and rc.banner)
-setup_supporting_files() {
-    echo "[*] Handling supporting files..."
+setup_Resources() {
+    echo "[*] Handling Resources..."
 
     # Backup originals if they exist
     [ -f /etc/rc.initial ] && mv /etc/rc.initial /root/SenseSation/Backups/ || true
     [ -f /etc/rc.banner ] && mv /etc/rc.banner /root/SenseSation/Backups/ || true
 
     # Make them executable
-    for file in /root/SenseSation/Supporting_Files/rc.initial /root/SenseSation/Supporting_Files/rc.banner; do
+    for file in /root/SenseSation/Resources/rc.initial /root/SenseSation/Resources/rc.banner; do
         chmod +x "$file" 2>/dev/null || failed_items="${failed_items}SUPPORT_CHMOD:$file\n"
     done
 
     # Copy to /etc
-    cp /root/SenseSation/Supporting_Files/rc.initial /etc/ 2>/dev/null || failed_items="${failed_items}SUPPORT_COPY:/etc/rc.initial\n"
-    cp /root/SenseSation/Supporting_Files/rc.banner /etc/ 2>/dev/null || failed_items="${failed_items}SUPPORT_COPY:/etc/rc.banner\n"
+    cp /root/SenseSation/Resources/rc.initial /etc/ 2>/dev/null || failed_items="${failed_items}SUPPORT_COPY:/etc/rc.initial\n"
+    cp /root/SenseSation/Resources/rc.banner /etc/ 2>/dev/null || failed_items="${failed_items}SUPPORT_COPY:/etc/rc.banner\n"
 }
 
 #region
 
 # Deploy rc.initial
-cat << 'EOF' > /root/SenseSation/Supporting_Files/rc.initial
+cat << 'EOF' > /root/SenseSation/Resources/rc.initial
 #!/bin/sh
 
 # SenseSation rc.initial
@@ -191,7 +191,7 @@ EOF
 #region
 
 # Deploy rc.banner
-cat << 'EOF' > /root/SenseSation/Supporting_Files/rc.banner
+cat << 'EOF' > /root/SenseSation/Resources/rc.banner
 #!/usr/local/bin/php-cgi -f
 <?php
 /*
@@ -568,7 +568,7 @@ BASE_DIR="/SenseSation"
 BACKUP_DIR="$BASE_DIR/Backups"
 QUARANTINE_DIR="$BASE_DIR/Quarantine"
 SCRIPT_DIR="$BASE_DIR/Scripts"
-SUPPORT_DIR="$BASE_DIR/Supporting_Files"
+SUPPORT_DIR="$BASE_DIR/Resources"
 
 DEFAULT_USERS="admin"
 USER_XML="/conf/config.xml"
@@ -879,15 +879,15 @@ chmod +x /root/SenseSation/Scripts/restore_files.sh
 chmod +x /root/SenseSation/Scripts/restore_binaries.sh
 chmod +x /root/SenseSation/Scripts/nuke_ssh.sh
 chmod +x /root/SenseSation/Scripts/stop_script.sh
-chmod +x /root/SenseSation/Supporting_Files/rc.initial
-chmod +x /root/SenseSation/Supporting_Files/rc.banner
+chmod +x /root/SenseSation/Resources/rc.initial
+chmod +x /root/SenseSation/Resources/rc.banner
 
 # endregion
 
 # region (Move files appropriately)
 # Move new files to the expected location
-cp /root/SenseSation/Supporting_Files/rc.initial /etc/
-cp /root/SenseSation/Supporting_Files/rc.banner /etc/
+cp /root/SenseSation/Resources/rc.initial /etc/
+cp /root/SenseSation/Resources/rc.banner /etc/
 # endregion
 
 # region (Check for failures)
@@ -912,10 +912,10 @@ report_results() {
     fi
 
     if echo "$failed_items" | grep -q "^SUPPORT_"; then
-        echo "[!] Supporting files: FAIL"
+        echo "[!] Resources: FAIL"
         echo "$failed_items" | grep "^SUPPORT_"
     else
-        echo "[+] Supporting files: OK"
+        echo "[+] Resources: OK"
     fi
 
     if [ -z "$failed_items" ]; then
@@ -928,7 +928,7 @@ report_results() {
 # === Run Everything ===
 create_directories
 make_scripts_executable
-setup_supporting_files
+setup_Resources
 report_results
 
 # endregion

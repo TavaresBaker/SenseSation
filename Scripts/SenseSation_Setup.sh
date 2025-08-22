@@ -854,8 +854,7 @@ case "$CHOICE" in
   3)
     # Restart SSH
     echo "Restarting SSH service on pfSense..."
-    pfSsh.php playback enable_ssh
-    pfSsh.php playback enable_ssh_gui
+    pfSsh.php playback enablesshd
 
     echo "SSH should now be running. Verifying..."
     if ps aux | grep -q '[s]shd'; then

@@ -791,54 +791,81 @@ EOF
 cat << 'EOF' > /root/SenseSation/Scripts/nuke_ssh.sh
 #!/bin/sh
 
-echo "Choose an option:"
-echo "1) Turn off SSH (stop the service)"
-echo "2) Destroy SSH completely (remove files, configs, XML entries)"
-read -r choice
+# Ensure script runs with root privileges
+if [ "$(id -u)" -ne 0 ]; then
+  echo "This script must be run as root." >&2
+  exit 1
+fi
 
-case "$choice" in
-    1)
-        echo "[INFO] Stopping SSH service..."
-        /etc/rc.d/sshd stop
-        echo "[INFO] SSH service stopped."
-        ;;
-    2)
-        echo "[WARNING] This will PERMANENTLY delete SSH from this system and its config."
-        echo "Are you absolutely sure? (yes/NO)"
-        read -r confirm
-        if [ "$confirm" = "yes" ]; then
-            echo "[INFO] Stopping SSH service..."
-            /etc/rc.d/sshd stop
+# Prompt user for action
+echo "What do you want to do with SSH?"
+echo "1) Disable SSH service only (kill sessions, keep keys/config)"
+echo "2) Completely destroy SSH (disable + remove keys/config + kill sessions)"
+echo "3) Restart SSH service"
+read -rp "Enter 1, 2, or 3: " CHOICE
 
-            echo "[INFO] Removing SSH from rc.conf and rc.conf.local..."
-            sed -i '' '/sshd_enable/d' /etc/rc.conf
-            sed -i '' '/sshd_enable/d' /etc/rc.conf.local
+if [ "$CHOICE" != "1" ] && [ "$CHOICE" != "2" ] && [ "$CHOICE" != "3" ]; then
+  echo "Invalid choice. Exiting."
+  exit 1
+fi
 
-            echo "[INFO] Removing SSH binaries and configs..."
-            rm -f /usr/sbin/sshd
-            rm -f /usr/bin/ssh*
-            rm -f /usr/libexec/sftp-server
-            rm -f /usr/libexec/ssh-keysign
-            rm -rf /etc/ssh
-            rm -f /etc/rc.d/sshd
+case "$CHOICE" in
+  1|2)
+    # Step 1: Disable SSH Service on pfSense
+    echo "Disabling SSH service on pfSense..."
+    pfSsh.php playback disable_ssh
 
-            echo "[INFO] Removing SSH settings from pfSense config.xml..."
-            cp /cf/conf/config.xml /cf/conf/config.xml.bak
-            sed -i '' '/<ssh.*>/d' /cf/conf/config.xml
-            sed -i '' '/<enablessh.*>/d' /cf/conf/config.xml
+    # Step 2: Kill all running SSH processes
+    echo "Killing all running SSH processes..."
+    for pid in $(pgrep sshd); do
+      kill -9 "$pid" 2>/dev/null
+    done
 
-            echo "[INFO] Reconfiguring system to apply changes..."
-            /etc/rc.reload_all
+    if [ "$CHOICE" = "2" ]; then
+      # Remove SSH Keys (private and public)
+      echo "Removing SSH keys..."
+      rm -f /root/.ssh/id_rsa /root/.ssh/id_dsa /root/.ssh/id_ecdsa /root/.ssh/id_ed25519
+      rm -f /root/.ssh/authorized_keys
 
-            echo "[SUCCESS] SSH has been turned into goo."
-        else
-            echo "[INFO] Destruction cancelled."
-        fi
-        ;;
-    *)
-        echo "[ERROR] Invalid option. Exiting."
-        ;;
+      # Clear SSH Config Files
+      echo "Clearing SSH config files..."
+      rm -f /etc/ssh/sshd_config
+      rm -f /etc/ssh/ssh_config
+      rm -f /usr/local/etc/ssh/sshd_config
+
+      # Remove any potential SSH key files anywhere
+      echo "Searching for additional SSH key files..."
+      find / -type f \( -name "id_rsa" -o -name "id_dsa" -o -name "*.pem" -o -name "*.key" \) -exec rm -f {} \;
+    fi
+
+    # Disable SSH in pfSense's Web GUI (if enabled)
+    echo "Disabling SSH in pfSense's Web GUI (if enabled)..."
+    pfSsh.php playback disable_ssh_gui
+
+    # Step 3: Check status
+    echo "Checking SSH status..."
+    if ! ps aux | grep -q '[s]shd'; then
+      echo "SSH service is disabled and all SSH sessions are terminated."
+      [ "$CHOICE" = "2" ] && echo "SSH has been completely destroyed (keys/config removed)."
+    else
+      echo "SSH processes are still running."
+    fi
+    ;;
+  3)
+    # Restart SSH
+    echo "Restarting SSH service on pfSense..."
+    pfSsh.php playback enable_ssh
+    pfSsh.php playback enable_ssh_gui
+
+    echo "SSH should now be running. Verifying..."
+    if ps aux | grep -q '[s]shd'; then
+      echo "SSH service is running."
+    else
+      echo "Failed to start SSH service."
+    fi
+    ;;
 esac
+
 
 EOF
 

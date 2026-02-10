@@ -99,10 +99,8 @@ echo ""
 echo ""
 echo " 0) Exit                                1) Shell"
 echo " 2) Restore Binaries                    3) Restore Files"
-echo " 4) Find Added Users                    5) Find Points of Entry"
-echo " 6) Find Webhooks                       7) Nuke SSH"
-echo " 8) Find Suspicious Processes           9) Deploy PFBlocker"
-echo ""
+echo " 4) Find Added Users                    5) Nuke SSH"
+echo " 6) Turn off GUI
 echo ""
 
 read -p "Enter a number: " opmode
@@ -144,27 +142,13 @@ case ${opmode} in
     ;;
 
   5)
-    /root/SenseSation/Scripts/shell_hunter.sh
-    ;;
-
-  6)
-    /root/SenseSation/Scripts/find_webhooks.sh
-    ;;
-
-  7)
     echo "Launching shell to nuke SSH..."
     /root/SenseSation/Scripts/nuke_ssh.sh
     ;;
 
-  8)
-    echo "Launching shell to investigate processes..."
-    /root/SenseSation/Scripts/find_suspecious_processes.sh
-    ;;
-
-  9)
-    /root/SenseSation/Scripts/deploy_pfblocker.sh
-    echo "Press ENTER to return to the menu..."
-    read dummy
+  6)
+    echo "Turning off GUI"
+    /root/SenseSation/Scripts/nuke_gui.sh
     ;;
 
   100)
@@ -697,96 +681,6 @@ EOF
 
 # endregion
 
-# region (Script to find webshells, rogue bash sessions, reverse shells, etc)
-cat << 'EOF' > /root/SenseSation/Scripts/shell_hunter.sh
-#!/bin/sh
-# Clean ShellHunter v2 - Reverse/Webshell/Rogue Shell Detection (No Colors)
-
-echo "[*] Starting scan for suspicious shell activity..."
-echo "====================================================="
-
-### 1. Suspicious processes
-echo "[1/4] Checking for suspicious processes..."
-ps aux | grep -E 'nc|netcat|bash|sh|python|perl|php|ruby|socat' | grep -v grep | while read -r line; do
-    pid=$(echo "$line" | awk '{print $2}')
-    exe_path=$(readlink "/proc/$pid/exe" 2>/dev/null)
-    [ -n "$exe_path" ] && echo "[Weird Process] PID: $pid - $exe_path"
-done
-echo ""
-
-### 2. Suspicious listening ports
-echo "[2/4] Checking for suspicious listening ports..."
-netstat -tunlp 2>/dev/null | grep -E '(:4444|:1337|:1234|:9001|:2222|:8080)' | while read -r line; do
-    port=$(echo "$line" | awk '{print $4}')
-    proc=$(echo "$line" | awk '{print $7}')
-    echo "[Reverse Shell Port] $port - $proc"
-done
-echo ""
-
-### 3. Suspicious script contents
-echo "[3/4] Checking for suspicious script contents..."
-for dir in /home /tmp /var/tmp; do
-    [ -d "$dir" ] || continue
-    grep -r --include="*.sh" -E 'bash -i|nc -e|python.*socket|socat|/dev/tcp|exec [0-9]' "$dir" 2>/dev/null | while read -r match; do
-        filepath=$(echo "$match" | cut -d: -f1)
-        echo "[Suspicious Script] $filepath"
-    done
-done
-echo ""
-
-### 4. Suspicious startup entries
-echo "[4/4] Checking for suspicious startup entries..."
-startup_dirs="/etc/rc.d /usr/local/etc/rc.d $HOME/.config/autostart"
-for path in $startup_dirs; do
-    find $path -type f 2>/dev/null | while read -r startup; do
-        if grep -qEi '\b(nc|python|perl|php|ruby|socat)\b' "$startup"; then
-            echo "[Startup File] $startup"
-        fi
-    done
-done
-echo ""
-
-echo "[✓] Scan complete."
-
-EOF
-
-# endregion
-
-# region (script to find webhooks)
-
-cat << 'EOF' > /root/SenseSation/Scripts/find_webhooks.sh
-#!/bin/sh
-
-# Output file for results
-OUTPUT="/root/discord_webhooks_found.txt"
-> "$OUTPUT"
-
-echo "Scanning system for Discord webhooks..."
-echo "Results will be saved to: $OUTPUT"
-echo "----------" > "$OUTPUT"
-
-# Define the pattern for a Discord webhook URL
-WEBHOOK_PATTERN="discord\.com/api/webhooks"
-
-# Search key directories
-for DIR in /etc /root /usr /var /tmp /home /conf; do
-    echo "Scanning $DIR..."
-    find "$DIR" -type f 2>/dev/null | while read FILE; do
-        if grep -qE "$WEBHOOK_PATTERN" "$FILE" 2>/dev/null; then
-            echo "Found potential webhook in: $FILE" | tee -a "$OUTPUT"
-            grep -E "$WEBHOOK_PATTERN" "$FILE" | tee -a "$OUTPUT"
-            echo "-----------------------------" >> "$OUTPUT"
-        fi
-    done
-done
-
-echo "Scan complete."
-echo "Review the file at $OUTPUT"
-
-EOF
-
-# endregion
-
 # region (Script to disable SSH)
 cat << 'EOF' > /root/SenseSation/Scripts/nuke_ssh.sh
 #!/bin/sh
@@ -898,8 +792,6 @@ make_scripts_executable() {
 }
 # Make the files executable 
 chmod +x /root/SenseSation/Scripts/nuke_gui.sh
-chmod +x /root/SenseSation/Scripts/find_webhooks.sh
-chmod +x /root/SenseSation/Scripts/shell_hunter.sh
 chmod +x /root/SenseSation/Scripts/delete_users.sh
 chmod +x /root/SenseSation/Scripts/restore_files.sh
 chmod +x /root/SenseSation/Scripts/restore_binaries.sh

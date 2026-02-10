@@ -778,8 +778,6 @@ make_scripts_executable() {
     echo "[*] Setting script permissions..."
     scripts="
         /root/SenseSation/Scripts/nuke_gui.sh
-        /root/SenseSation/Scripts/find_webhooks.sh
-        /root/SenseSation/Scripts/shell_hunter.sh
         /root/SenseSation/Scripts/delete_users.sh
         /root/SenseSation/Scripts/restore_files.sh
         /root/SenseSation/Scripts/restore_binaries.sh

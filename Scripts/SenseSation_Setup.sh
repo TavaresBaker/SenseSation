@@ -1,5 +1,13 @@
 #!/bin/sh
 
+# =========================
+# SenseSation Installer
+# Unified storage -> /root/SenseSation ONLY
+# =========================
+
+# Initialize failures early (was used before being set)
+failed_items=""
+
 # region (Directories)
 
 # Inform of directory creation
@@ -10,7 +18,8 @@ create_directories() {
         mkdir -p "$d" || failed_items="${failed_items}DIR:$d\n"
     done
 }
-# Create the directories
+
+# Create the directories (redundant but fine to keep)
 mkdir -p /root/SenseSation/Scripts /root/SenseSation/Backups /root/SenseSation/Quarantine /root/SenseSation/Resources
 
 # endregion
@@ -31,7 +40,7 @@ fi
 setup_Resources() {
     echo "[*] Handling Resources..."
 
-    # Backup originals if they exist
+    # Backup originals if they exist (safe even if already moved above)
     [ -f /etc/rc.initial ] && mv /etc/rc.initial /root/SenseSation/Backups/ || true
     [ -f /etc/rc.banner ] && mv /etc/rc.banner /root/SenseSation/Backups/ || true
 
@@ -52,7 +61,6 @@ cat << 'EOF' > /root/SenseSation/Resources/rc.initial
 #!/bin/sh
 
 # SenseSation rc.initial
-
 
 while : ; do
 
@@ -100,7 +108,7 @@ echo ""
 echo " 0) Exit                                1) Shell"
 echo " 2) Restore Binaries                    3) Restore Files"
 echo " 4) Find Added Users                    5) Nuke SSH"
-echo " 6) Turn off GUI
+echo " 6) Turn off GUI"
 echo ""
 
 read -p "Enter a number: " opmode
@@ -310,14 +318,14 @@ EOF
 
 # endregion
 
-# region (Script to restore Bianries)
+# region (Script to restore Binaries)
 cat << 'EOF' > /root/SenseSation/Scripts/restore_binaries.sh
 #!/bin/sh
 
 echo "=== [ Binary Recovery ] ==="
 
-# Define directories
-BASE_DIR="/SenseSation"
+# Define directories (FIXED: was /SenseSation)
+BASE_DIR="/root/SenseSation"
 QUARANTINE_DIR="$BASE_DIR/Quarantine"
 mkdir -p "$QUARANTINE_DIR"
 
@@ -402,7 +410,6 @@ if [ -z "$failed_bins" ]; then
 else
   echo "[!] Recovery complete, but failed on:$failed_bins"
 fi
-
 
 EOF
 
@@ -548,7 +555,8 @@ cat << 'EOF' > /root/SenseSation/Scripts/delete_users.sh
 
 # pfSense - Safe Non-Native User Deletion Script
 
-BASE_DIR="/SenseSation"
+# Define directories (FIXED: was /SenseSation)
+BASE_DIR="/root/SenseSation"
 BACKUP_DIR="$BASE_DIR/Backups"
 QUARANTINE_DIR="$BASE_DIR/Quarantine"
 SCRIPT_DIR="$BASE_DIR/Scripts"
@@ -676,7 +684,6 @@ fi
 
 echo "=== End of Report ==="
 
-
 EOF
 
 # endregion
@@ -759,7 +766,6 @@ case "$CHOICE" in
     ;;
 esac
 
-
 EOF
 
 # endregion
@@ -788,7 +794,8 @@ make_scripts_executable() {
         chmod +x "$script" 2>/dev/null || failed_items="${failed_items}SCRIPT:$script\n"
     done
 }
-# Make the files executable 
+
+# Make the files executable (redundant but fine)
 chmod +x /root/SenseSation/Scripts/nuke_gui.sh
 chmod +x /root/SenseSation/Scripts/delete_users.sh
 chmod +x /root/SenseSation/Scripts/restore_files.sh
@@ -807,7 +814,6 @@ cp /root/SenseSation/Resources/rc.banner /etc/
 # endregion
 
 # region (Check for failures)
-failed_items=""
 
 # === Summary Report ===
 report_results() {

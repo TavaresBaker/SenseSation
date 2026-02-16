@@ -811,8 +811,34 @@ EOF
 
 # region (Script to nuke the Web GUI)
 cat << 'EOF' > /root/SenseSation/Scripts/nuke_gui.sh
-pfSsh.php playback svc stop lighttpd
+#!/bin/sh
 
+echo ""
+echo "==== pfSense WebGUI Control ===="
+echo "1) Turn OFF WebGUI"
+echo "2) Turn ON WebGUI"
+echo ""
+read -rp "Choose option (1 or 2): " CHOICE
+
+case "$CHOICE" in
+
+1)
+    echo "Stopping WebGUI..."
+    pfSsh.php playback svc stop lighttpd
+    echo "WebGUI stopped."
+    ;;
+
+2)
+    echo "Starting WebGUI..."
+    pfSsh.php playback svc start lighttpd
+    echo "WebGUI started."
+    ;;
+
+*)
+    echo "Invalid option."
+    ;;
+
+esac
 EOF
 
 # endregion

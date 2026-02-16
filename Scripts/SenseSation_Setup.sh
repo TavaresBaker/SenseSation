@@ -553,17 +553,36 @@ EOF
 cat << 'EOF' > /root/SenseSation/Scripts/delete_users.sh
 #!/bin/sh
 
-# pfSense - Safe Non-Native User Deletion Script (Multi-Delete)
+# pfSense - Safe Non-Native User Deletion Script (MULTI-DELETE)
+
+BASE_DIR="/root/SenseSation"
+BACKUP_DIR="$BASE_DIR/Backups"
+QUARANTINE_DIR="$BASE_DIR/Quarantine"
+SCRIPT_DIR="$BASE_DIR/Scripts"
+SUPPORT_DIR="$BASE_DIR/Resources"
 
 DEFAULT_USERS="admin"
 USER_XML="/conf/config.xml"
-BACKUP_XML="/conf/config.xml.bak"
-USER_DIRS="/home /usr/local/etc"  # Directories to check and delete user directories from
+USER_DIRS="/home /usr/local/etc"
+
+NOW=$(date +%Y%m%d_%H%M%S)
+BACKUP_XML="$BACKUP_DIR/config.xml.bak.$NOW"
+
+mkdir -p "$BACKUP_DIR" "$QUARANTINE_DIR" "$SCRIPT_DIR" "$SUPPORT_DIR"
 
 echo "===[ pfSense Non-Native Users Report ]==="
 echo ""
 
-# Extract all users
+if [ ! -f "$USER_XML" ]; then
+  echo "ERROR: $USER_XML not found."
+  exit 1
+fi
+
+if ! command -v xmllint >/dev/null 2>&1; then
+  echo "ERROR: xmllint not found."
+  exit 1
+fi
+
 ALL_USERS=$(xmllint --xpath '//user/name/text()' "$USER_XML" 2>/dev/null)
 
 USER_LIST=""
@@ -571,159 +590,138 @@ INDEX=1
 
 echo "Found users:"
 for USER in $ALL_USERS; do
-    if echo "$DEFAULT_USERS" | grep -qw "$USER"; then
-        continue
-    fi
+  if echo "$DEFAULT_USERS" | grep -qw "$USER"; then
+    continue
+  fi
 
-    echo "$INDEX) Username: $USER"
+  echo "$INDEX) Username: $USER"
 
-    GROUPS=$(xmllint --xpath "string(//user[name='$USER']/groups/item)" "$USER_XML" 2>/dev/null)
-    [ -z "$GROUPS" ] && GROUPS="(none)"
+  GROUPS=$(xmllint --xpath "string(//user[name='$USER']/groups/item)" "$USER_XML" 2>/dev/null)
+  [ -z "$GROUPS" ] && GROUPS="(none)"
 
-    DESC=$(xmllint --xpath "string(//user[name='$USER']/descr)" "$USER_XML" 2>/dev/null)
-    [ -z "$DESC" ] && DESC="(no description)"
+  DESC=$(xmllint --xpath "string(//user[name='$USER']/descr)" "$USER_XML" 2>/dev/null)
+  [ -z "$DESC" ] && DESC="(no description)"
 
-    echo "   Groups: $GROUPS"
-    echo "   Description: $DESC"
-    echo ""
+  echo "   Groups: $GROUPS"
+  echo "   Description: $DESC"
+  echo ""
 
-    USER_LIST="${USER_LIST}${USER}\n"
-    INDEX=$((INDEX + 1))
+  USER_LIST="${USER_LIST}${USER}\n"
+  INDEX=$((INDEX + 1))
 done
 
-TOTAL_USERS=$((INDEX - 1))
-
-if [ "$TOTAL_USERS" -le 0 ]; then
-    echo "No non-default users found."
-    echo "=== End of Report ==="
-    exit 0
+if [ "$INDEX" -eq 1 ]; then
+  echo "No non-default users found."
+  echo "=== End of Report ==="
+  exit 0
 fi
 
-echo "Enter user number(s) to delete:"
-echo "  - Examples: 1 3 5   OR   1,3,5"
-echo "  - Type: all   (delete all listed users)"
-echo "Press Enter for none: "
-read -r USER_SELECTION
+echo "Enter user numbers to delete (space-separated), or press Enter for none:"
+read -r USER_NUMBERS
+echo ""
 
-[ -z "$USER_SELECTION" ] && echo "No user deleted." && echo "=== End of Report ===" && exit 0
+[ -z "$USER_NUMBERS" ] && { echo "No user deleted."; echo "=== End of Report ==="; exit 0; }
 
-# Normalize input: commas -> spaces, collapse extra whitespace
-USER_SELECTION=$(echo "$USER_SELECTION" | tr ',' ' ' | tr -s ' ')
+echo "$USER_NUMBERS" | grep -qE '^[0-9 ]+$' || { echo "Invalid input. Use space-separated numbers like: 1 3 4"; exit 1; }
 
-# Backup once
+UNIQUE_NUMBERS=$(echo "$USER_NUMBERS" | tr ' ' '\n' | grep -E '^[0-9]+$' | awk '!seen[$0]++' | tr '\n' ' ' | xargs)
+
+TO_DELETE=""
+for N in $UNIQUE_NUMBERS; do
+  U=$(echo -e "$USER_LIST" | sed -n "${N}p" | xargs)
+  [ -z "$U" ] && { echo "Invalid selection: $N (skipping)"; continue; }
+  TO_DELETE="${TO_DELETE} ${U}"
+done
+
+TO_DELETE=$(echo "$TO_DELETE" | xargs)
+
+[ -z "$TO_DELETE" ] && { echo "No valid users selected."; echo "=== End of Report ==="; exit 0; }
+
+echo "Selected users for deletion:"
+for U in $TO_DELETE; do
+  echo " - $U"
+done
+echo ""
+
 echo "Backing up current config to $BACKUP_XML..."
-cp "$USER_XML" "$BACKUP_XML" || { echo "Backup failed. Aborting."; exit 1; }
+cp -p "$USER_XML" "$BACKUP_XML" || { echo "ERROR: Failed to backup config."; exit 1; }
 
-# Function: delete a single user from XML + dirs
-delete_one_user() {
-    DELETE_USER="$1"
-    echo ""
-    echo "Removing user '$DELETE_USER'..."
+TMP_XML="/tmp/config.xml.sensesation.$NOW"
+cp -p "$BACKUP_XML" "$TMP_XML" || { echo "ERROR: Failed to stage temp config."; exit 1; }
 
-    # Escape special regex characters in username (for awk regex match safety)
-    ESCAPED_USER=$(printf '%s\n' "$DELETE_USER" | sed 's/[][\.*^$(){}?+|/]/\\&/g')
+remove_user_block() {
+  _user="$1"
+  _in="$_infile"
+  _out="$_outfile"
 
-    # Write to a temp file first to avoid partially-written config on failure
-    TMP_XML="/tmp/config.xml.$$"
+  esc_user=$(printf '%s\n' "$_user" | sed 's/[][\.*^$(){}?+|/]/\\&/g')
 
-    awk -v user="$ESCAPED_USER" '
-    BEGIN { in_block = 0; block = "" }
-    /<user>/ { in_block = 1; block = $0 ORS; next }
+  awk -v user="$esc_user" '
+    BEGIN { in_block=0; block="" }
+    /<user>/ { in_block=1; block=$0 ORS; next }
     /<\/user>/ {
-        block = block $0 ORS;
-        if (block ~ "<name>" user "</name>") {
-            in_block = 0;
-            block = "";
-            next;  # skip writing this user block
-        } else {
-            printf "%s", block;
-            in_block = 0;
-            block = "";
-            next;
-        }
+      block = block $0 ORS;
+      if (block ~ "<name>" user "</name>") {
+        in_block=0; block=""; next;
+      } else {
+        printf "%s", block;
+        in_block=0; block=""; next;
+      }
     }
     {
-        if (in_block) {
-            block = block $0 ORS;
-        } else {
-            print;
-        }
+      if (in_block) block = block $0 ORS;
+      else print;
     }
-    ' "$USER_XML" > "$TMP_XML" || { echo "Failed updating XML for $DELETE_USER"; rm -f "$TMP_XML"; return 1; }
-
-    mv "$TMP_XML" "$USER_XML" || { echo "Failed writing config.xml for $DELETE_USER"; rm -f "$TMP_XML"; return 1; }
-
-    # Remove the user's home directories from the specified locations
-    echo "Removing directories associated with '$DELETE_USER'..."
-    for DIR in $USER_DIRS; do
-        USER_DIR_PATH="$DIR/$DELETE_USER"
-        if [ -d "$USER_DIR_PATH" ]; then
-            echo "Removing directory: $USER_DIR_PATH"
-            rm -rf "$USER_DIR_PATH"
-        else
-            echo "No directory found for user in $DIR"
-        fi
-    done
-
-    echo "User '$DELETE_USER' removed."
-    return 0
+  ' "$_in" > "$_out"
 }
 
-# Build list of users to delete
-TO_DELETE_USERS=""
-
-if [ "$USER_SELECTION" = "all" ]; then
-    # all non-default users
-    TO_DELETE_USERS=$(echo -e "$USER_LIST" | sed '/^[[:space:]]*$/d')
-else
-    # validate and map numbers -> usernames
-    for N in $USER_SELECTION; do
-        if ! echo "$N" | grep -qE '^[0-9]+$'; then
-            echo "Invalid input token: '$N' (must be numbers or 'all')"
-            exit 1
-        fi
-        if [ "$N" -lt 1 ] || [ "$N" -gt "$TOTAL_USERS" ]; then
-            echo "Selection out of range: $N (valid: 1-$TOTAL_USERS)"
-            exit 1
-        fi
-
-        U=$(echo -e "$USER_LIST" | sed -n "${N}p" | xargs)
-        [ -z "$U" ] && echo "Failed to resolve user #$N" && exit 1
-
-        # dedupe (avoid deleting same user twice)
-        echo "$TO_DELETE_USERS" | grep -qw "$U" || TO_DELETE_USERS="$TO_DELETE_USERS $U"
-    done
-fi
-
-echo ""
-echo "Selected user(s) for deletion:"
-for U in $TO_DELETE_USERS; do
-    echo " - $U"
+echo "Removing users from config..."
+for U in $TO_DELETE; do
+  _infile="$TMP_XML"
+  _outfile="/tmp/config.xml.sensesation.next.$NOW"
+  remove_user_block "$U"
+  mv "$_outfile" "$TMP_XML"
 done
 
-# Delete each selected user
-FAIL=0
-for U in $TO_DELETE_USERS; do
-    # Extra safety: never delete defaults
-    if echo "$DEFAULT_USERS" | grep -qw "$U"; then
-        echo "Skipping default/protected user: $U"
-        continue
+mv "$TMP_XML" "$USER_XML" || { echo "ERROR: Failed to write updated config."; exit 1; }
+
+echo ""
+echo "Archiving and removing directories associated with deleted users..."
+for U in $TO_DELETE; do
+  for DIR in $USER_DIRS; do
+    USER_DIR_PATH="$DIR/$U"
+
+    if [ -d "$USER_DIR_PATH" ]; then
+      ARCHIVE_NAME="user_backup_${U}_$(echo "$DIR" | tr '/' '_')_${NOW}.tar.gz"
+      ARCHIVE_PATH="$QUARANTINE_DIR/$ARCHIVE_NAME"
+
+      echo "Archiving $USER_DIR_PATH -> $ARCHIVE_PATH"
+      tar -czf "$ARCHIVE_PATH" -C "$(dirname "$USER_DIR_PATH")" "$(basename "$USER_DIR_PATH")"
+
+      if [ -f "$ARCHIVE_PATH" ]; then
+        echo "Archive OK. Removing: $USER_DIR_PATH"
+        rm -rf "$USER_DIR_PATH"
+      else
+        echo "ERROR: Failed to archive $USER_DIR_PATH (skipping deletion)"
+      fi
     fi
-    delete_one_user "$U" || FAIL=1
+  done
 done
 
 echo ""
 echo "Reloading pfSense config..."
 /etc/rc.reload_all
 
-if [ "$FAIL" -eq 0 ]; then
-    echo "All selected users removed and config reloaded."
-else
-    echo "Some deletions failed (config reloaded anyway). Review output above."
-    echo "Backup is at: $BACKUP_XML"
-fi
+echo ""
+echo "Deleted users:"
+for U in $TO_DELETE; do
+  echo " - $U"
+done
 
+echo ""
+echo "Backup saved at: $BACKUP_XML"
 echo "=== End of Report ==="
+
 
 EOF
 

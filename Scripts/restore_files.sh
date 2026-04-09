@@ -55,7 +55,7 @@ echo "[+] Archives created: SenseSation_Backups_$(date +%Y%m%d_%H%M%S).zip and S
 
 # Replace web interface
 cd /usr/local || exit 1
-fetch "https://codeload.github.com/pfsense/pfsense/zip/refs/heads/${BRANCH}" -o pfsense.zip || exit 1
+fetch "https://codeload.github.com/pfsense/pfsense/zip/refs/heads/master/src/usr/local/www" -o pfsense.zip || exit 1
 unzip -oq pfsense.zip
 rm -rf www
 cp -a "pfsense-${BRANCH}/src/usr/local/www" .

@@ -22,7 +22,7 @@ FAILED_FILES=""
 cd /root || exit 1
 
 # Assume the master script has already created the SenseSation_Backups directory
-BACKUP_DIR="/root/SenseSation_Backups"
+BACKUP_DIR="/root/SenseSation/Backups"
 
 # Check if the backup folder exists, if not exit
 if [ ! -d "$BACKUP_DIR" ]; then

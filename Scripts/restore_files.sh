@@ -5,7 +5,7 @@
 
 # Detect pfSense version
 VERSION_RAW=$(cat /etc/version | cut -d'-' -f1)
-BRANCH="RELENG_$(echo "$VERSION_RAW" | tr '.' '_')"
+BRANCH="master$(echo "$VERSION_RAW" | tr '.' '_')"
 
 # Fallback options if main branch fails
 BRANCHES="$BRANCH master main"

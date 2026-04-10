@@ -15,9 +15,9 @@
 # Install root — scripts go into Scripts/ subdirectory to match repo layout
 INSTALL_ROOT="/opt/pf_hunter"
 INSTALL_SCRIPTS="$INSTALL_ROOT/Scripts"
-GITHUB_USER="YOUR_GITHUB_USERNAME"
-GITHUB_REPO="YOUR_REPO_NAME"
-GITHUB_BRANCH="main"
+GITHUB_USER="TavaresBaker"
+GITHUB_REPO="SenseSation"
+GITHUB_BRANCH="P-Sensual"
 GITHUB_ZIP="https://github.com/${GITHUB_USER}/${GITHUB_REPO}/archive/refs/heads/${GITHUB_BRANCH}.zip"
 
 R='\033[0;31m'; G='\033[0;32m'; Y='\033[1;33m'; C='\033[0;36m'; B='\033[1m'; N='\033[0m'
